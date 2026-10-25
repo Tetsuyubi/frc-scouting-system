@@ -37,6 +37,22 @@ fi
 
 echo "Using pip: $PIP_CMD"
 echo ""
+# Vercel's system Python is managed by uv and refuses pip installs (PEP 668),
+# so build inside a virtual environment there. Local runs are unchanged.
+if [ -n "${VERCEL:-}" ] && [ -z "${VIRTUAL_ENV:-}" ]; then
+    echo "Vercel build detected: creating a virtual environment"
+    # Outside the project folder, or the function bundle would include a second
+    # copy of every package.
+    BUILD_VENV="${TMPDIR:-/tmp}/vercel-build-venv"
+    $PYTHON_CMD -m venv "$BUILD_VENV"
+    # shellcheck disable=SC1091
+    source "$BUILD_VENV/bin/activate"
+    PYTHON_CMD="python"
+    PIP_CMD="python -m pip"
+    echo "Using venv Python: $(python --version)"
+    echo ""
+fi
+
 
 # Check Node.js
 if ! command -v node &> /dev/null; then

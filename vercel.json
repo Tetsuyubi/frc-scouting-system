@@ -11,7 +11,8 @@
       "use": "@vercel/python",
       "config": {
         "maxLambdaSize": "50mb",
-        "runtime": "python3.12"
+        "runtime": "python3.12",
+        "excludeFiles": "{node_modules/**,.vercel-build-venv/**,replay-system/**,tools/**,frontend/src/**,**/*.md,old_*.html,package*.json,webpack.config.js,eslint.config.js}"
       }
     },
     {
@@ -23,7 +24,13 @@
     }
   ],
   "routes": [
-    { "src": "/static/(.*)", "dest": "/$1" },
-    { "src": "/(.*)", "dest": "vercel_app.py" }
+    {
+      "src": "/static/(.*)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "vercel_app.py"
+    }
   ]
 }

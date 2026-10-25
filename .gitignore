@@ -107,3 +107,6 @@ staticfiles/
 
 # Local environment
 .env.local
+
+# Vercel project link (created by `vercel`)
+.vercel

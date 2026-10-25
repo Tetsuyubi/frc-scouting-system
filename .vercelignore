@@ -21,3 +21,6 @@ venv/
 .env.*
 env.txt
 db.sqlite3
+
+# Created by build.sh on Vercel
+.vercel-build-venv/

@@ -143,6 +143,12 @@ if DATABASE_URL:
             conn_health_checks=True,
         )
     }
+    if 'postgresql' in DATABASES['default'].get('ENGINE', ''):
+        # Supabase's pooler (pgbouncer) shares connections between clients, which
+        # server-side cursors don't survive; and a connection that can't be
+        # opened should fail fast rather than hang the whole request.
+        DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
+        DATABASES['default'].setdefault('OPTIONS', {}).setdefault('connect_timeout', 10)
 else:
     DATABASES = {
         'default': {
