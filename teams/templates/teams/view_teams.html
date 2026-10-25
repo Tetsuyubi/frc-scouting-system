@@ -246,10 +246,11 @@ html.inverted .status-complete {
     box-shadow: 0 3px 10px rgba(177,18,38,0.2);
 }
 
-/* Hide on small screens */
-@media (max-width: 560px) {
-    .col-rank { display: none; }
-}
+/* Ranking and matches-scouted are opt-in: the toggles above the table add
+   .show-rank / .show-matches to the table container. */
+.col-rank, .col-matches { display: none; }
+.show-rank .col-rank, .show-matches .col-matches { display: table-cell; }
+.team-meta { display: none; }
 
 /* Match count pill */
 .match-count-pill {
@@ -269,8 +270,52 @@ html.inverted .status-complete {
     font-size: 0.8rem;
     color: var(--border);
 }
+
+/* Optional-column toggles */
+.col-toggles { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.col-toggle { position: relative; margin: 0; cursor: pointer; }
+.col-toggle input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.col-toggle span {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 11px; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 700; white-space: nowrap;
+    color: var(--muted-text); background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.col-toggle span::before { content: "+"; font-weight: 800; }
+.col-toggle input:checked + span {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, var(--bg-elevated));
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.col-toggle input:checked + span::before { content: "✓"; }
+.col-toggle input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sort-btn[hidden] { display: none; }
+
+/* Phones: Team | Pit Scout | View fit on one line; rank and matches (when
+   toggled on) move under the team number instead of adding columns. */
 @media (max-width: 640px) {
-    .col-matches { display: none; }
+    .show-rank .col-rank, .show-matches .col-matches { display: none; }
+    .team-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+    .team-meta > * { display: none; }
+    .show-rank .team-meta .meta-rank,
+    .show-matches .team-meta .meta-matches { display: inline-flex; }
+    .team-meta .rank-pill, .team-meta .match-count-pill { font-size: 0.68rem; padding: 1px 7px; }
+
+    #teams-table th, #teams-table td { padding: 8px 6px; }
+    #teams-table th:first-child, #teams-table td:first-child { padding-left: 10px; }
+    #teams-table th:last-child, #teams-table td:last-child { padding-right: 10px; }
+    #teams-table .status-complete,
+    #teams-table .status-action,
+    #teams-table .btn-view {
+        min-height: 34px;
+        padding: 0 10px;
+        font-size: 0.74rem;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+    .btn-view-long { display: none; }
 }
 
 /* No results */
@@ -491,13 +536,17 @@ html.inverted .pit-progress-fill { background: #4ade80; }
                 <button type="button" class="sort-btn" data-sort="number" aria-pressed="true">
                     Team # <span class="sort-caret" aria-hidden="true">▲</span>
                 </button>
-                <button type="button" class="sort-btn" data-sort="rank" aria-pressed="false">
+                <button type="button" class="sort-btn" data-sort="rank" aria-pressed="false" hidden>
                     Ranking <span class="sort-caret" aria-hidden="true">▲</span>
                 </button>
-                <button type="button" class="sort-btn" data-sort="matches" aria-pressed="false">
+                <button type="button" class="sort-btn" data-sort="matches" aria-pressed="false" hidden>
                     Matches <span class="sort-caret" aria-hidden="true">▲</span>
                 </button>
             </div>
+        </div>
+        <div class="col-toggles" role="group" aria-label="Show extra info">
+            <label class="col-toggle"><input type="checkbox" id="toggle-rank"><span>Ranking</span></label>
+            <label class="col-toggle"><input type="checkbox" id="toggle-matches"><span>Matches scouted</span></label>
         </div>
         <div class="search-wrapper">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -598,6 +647,10 @@ html.inverted .pit-progress-fill { background: #4ade80; }
                         <div>
                             <div class="team-number">{{ team.number }}</div>
                             {% if team.name %}<div class="team-name">{{ team.name }}</div>{% endif %}
+                            <div class="team-meta">
+                                {% if team.rank %}<span class="rank-pill meta-rank">#{{ team.rank }}</span>{% endif %}
+                                <span class="match-count-pill meta-matches">{{ team.match_count|default:0 }} match{{ team.match_count|pluralize:"es" }}</span>
+                            </div>
                         </div>
                     </div>
                 </td>
@@ -631,7 +684,7 @@ html.inverted .pit-progress-fill { background: #4ade80; }
                 <td style="text-align:right;">
                     <a class="btn-view"
                        href="{% url 'team_page' team.number %}{% if request.GET.comp %}?comp={{ request.GET.comp }}{% endif %}">
-                        View Team
+                        View<span class="btn-view-long">&nbsp;Team</span>
                         <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                     </a>
                 </td>
@@ -736,7 +789,36 @@ html.inverted .pit-progress-fill { background: #4ade80; }
         applySort();
     });
 
-    applySort();
+    /* ------------------------------------------------------------------
+       Optional info: ranking and matches scouted are off until asked for.
+       ------------------------------------------------------------------ */
+    var tableBox = document.querySelector('.theme-table-container');
+    var optional = [
+        { id: 'toggle-rank',    cls: 'show-rank',    key: 'teamsShowRank',    sort: 'rank' },
+        { id: 'toggle-matches', cls: 'show-matches', key: 'teamsShowMatches', sort: 'matches' }
+    ];
+
+    function applyOptional() {
+        optional.forEach(function (o) {
+            var box = document.getElementById(o.id);
+            tableBox.classList.toggle(o.cls, box.checked);
+            var btn = sortBox.querySelector('[data-sort="' + o.sort + '"]');
+            if (btn) { btn.hidden = !box.checked; }
+            /* Sorting by something that is hidden would look random. */
+            if (!box.checked && sort.key === o.sort) { sort.key = 'number'; sort.dir = 1; }
+        });
+        applySort();
+    }
+
+    optional.forEach(function (o) {
+        var box = document.getElementById(o.id);
+        try { box.checked = localStorage.getItem(o.key) === '1'; } catch (e) { /* default off */ }
+        box.addEventListener('change', function () {
+            try { localStorage.setItem(o.key, box.checked ? '1' : '0'); } catch (e) { /* still applies */ }
+            applyOptional();
+        });
+    });
+    applyOptional();
 
     /* Cap stagger delay so long lists don't wait forever */
     allRows.forEach(function (row, i) {

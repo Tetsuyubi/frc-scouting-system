@@ -1055,6 +1055,7 @@ html.inverted #settings-menu-panel {
 .settings-user-avatar {
   width: 30px; height: 30px;
   border-radius: 50%;
+  overflow: hidden;
   background: color-mix(in srgb, var(--accent) 14%, var(--bg));
   border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
   color: var(--accent);
@@ -1065,6 +1066,17 @@ html.inverted #settings-menu-panel {
   justify-content: center;
   text-transform: uppercase;
   flex-shrink: 0;
+}
+.settings-user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Restored when an image 404s and onerror strips it, so the initial still
+   reads as a tinted circle rather than an empty ring. */
+.settings-user-avatar.is-initial::after {
+  content: attr(data-initial);
 }
 .settings-panel-divider {
   border: none;
@@ -1570,6 +1582,205 @@ html.inverted .compdd-panel {
 })();
 </script>
 
+<!-- ======================================================
+     MOBILE MENU (<= 991px): compact grid, panels open downward
+     Loaded last so it overrides the desktop dropdown rules above.
+====================================================== -->
+<style id="mobile-menu">
+@media (max-width: 991px) {
+  .navbar-collapse.show {
+    max-height: calc(100dvh - 72px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.6rem 0.75rem 0.75rem;
+    margin-top: 0.35rem;
+  }
+
+  /* One compact grid per list; the gap replaces the old per-item margins. */
+  .navbar-collapse .navbar-nav {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+  }
+  .navbar-collapse .navbar-nav > .nav-item { margin: 0; width: auto; animation: none !important; }
+
+  /* Page links: two per row as small tiles. */
+  .navbar-collapse .navbar-nav.me-auto { grid-template-columns: 1fr 1fr; }
+  .navbar-collapse .navbar-nav.me-auto > .nav-item:not(.dropdown) { justify-self: stretch; min-width: 0; }
+  .navbar-collapse .navbar-nav.me-auto > .nav-item:not(.dropdown) > .nav-link,
+  .navbar-collapse .navbar-nav.me-auto > .nav-item.dropdown > .nav-link {
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 40px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-elevated);
+  }
+  .navbar-collapse .navbar-nav.me-auto > .nav-item.dropdown { display: contents; }
+  .navbar-collapse .navbar-nav.me-auto > .nav-item:has(#comp),
+  .navbar-collapse .navbar-nav.me-auto > .nav-item:has(.compdd) { grid-column: 1 / -1; }
+  #comp { margin-top: 0; }
+
+  /* Alerts | Language | Settings side by side. The "jump to team" search is left
+     out of the phone menu: it sat on top of the event picker's list. */
+  .navbar-collapse .navbar-nav.ms-auto {
+    grid-template-columns: repeat(3, 1fr);
+    align-items: stretch;
+    margin-top: 0.4rem;
+  }
+  .navbar-collapse .navbar-nav.ms-auto > .nav-item { display: contents; }
+  #team-search-wrap { display: none !important; }
+
+  .navbar-collapse .nav-icon-btn {
+    grid-row: 1;
+    width: 100%;
+    min-height: 40px;
+    justify-content: center;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.78rem;
+  }
+  .navbar-collapse #bell-btn::after,
+  .navbar-collapse #settings-toggle.dropdown-toggle::after {
+    display: inline;
+    border: 0;
+    margin: 0;
+    content: "Settings";
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  #bell-btn { grid-column: 1; }
+  #lang-toggle { grid-column: 2; }
+  #settings-toggle { grid-column: 3; }
+  .navbar-collapse #bell-btn::after { content: "Alerts"; }
+  #bell-badge { top: 3px !important; right: 6px !important; }
+
+  /* Every panel: full width, in the page flow, directly under the button row. */
+  .navbar-collapse .dropdown-menu,
+  #bell-panel {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    box-sizing: border-box;
+    box-shadow: none !important;
+    border-radius: 12px !important;
+    animation: none;
+  }
+  #bell-panel { max-height: 45dvh !important; }
+  #bell-list { max-height: 34dvh !important; }
+
+  /* Event picker: its list opens in the flow under the picker, not floating over the
+     buttons below it (the menu card clips anything that sticks out of it). */
+  .navbar-collapse .compdd { display: flex; flex-direction: column; width: 100%; }
+  /* Closed: out of the layout entirely (it is only transparent by default, which in
+     the page flow would leave an empty gap under the picker). */
+  .navbar-collapse .compdd:not(.open) .compdd-panel { display: none !important; }
+  .navbar-collapse .compdd.open .compdd-panel { display: block; animation: dropdownFade 0.18s ease-out; }
+  .navbar-collapse .compdd-panel {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    max-height: 45dvh;
+    margin-top: 0.4rem !important;
+    box-sizing: border-box;
+    box-shadow: none !important;
+    border-radius: 12px !important;
+    transform: none !important;
+  }
+
+  /* Strategy submenu sits right under its tile, inside the grid. */
+  .navbar-collapse .navbar-nav.me-auto .dropdown-menu {
+    grid-row: auto;
+    padding: 0.25rem !important;
+  }
+  .navbar-collapse .navbar-nav.me-auto .dropdown-item { padding: 0.55rem 0.75rem; }
+
+  /* Tighter list rows (the old rules added 0.75rem of padding and margin per row). */
+  .navbar-collapse .dropdown-menu li,
+  .navbar-collapse .dropdown-menu li + li { padding: 0; margin: 0; border-top: 0; }
+
+  /* Language: options as a wrapping row of chips. */
+  .lang-menu { padding: 0.4rem !important; }
+  .lang-menu.show { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .lang-menu .lang-menu-header { flex: 1 0 100%; padding: 0.1rem 0.3rem; }
+  .lang-menu li { flex: 1 1 calc(50% - 0.3rem); }
+  .lang-option { padding: 0.45rem 0.6rem; border: 1px solid var(--border); border-radius: 8px; }
+
+  /* Settings: compact rows. */
+  #settings-menu-panel { padding: 0.25rem !important; }
+  #settings-menu-panel > * { animation: none !important; }
+  #settings-menu-panel .settings-row { padding: 0.3rem 0.4rem; gap: 0.45rem; min-height: 36px; }
+  #settings-menu-panel .settings-row-icon { width: 24px; height: 24px; min-width: 24px; }
+  #settings-menu-panel .settings-user-header { padding: 0.25rem 0.4rem; }
+  #settings-menu-panel .settings-panel-divider { margin: 0.2rem 0; }
+}
+</style>
+<!-- ======================================================
+     DROPDOWN POLISH (all screen sizes): even rows, no divider lines
+====================================================== -->
+<style id="dropdown-polish">
+.navbar .dropdown-menu {
+  padding: 0.3rem;
+  border-radius: 12px;
+  min-width: 11rem;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12);
+}
+html.inverted .navbar .dropdown-menu { box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5); }
+
+/* The old rules gave every row 0.75rem of padding plus a divider line, which made
+   the rows uneven and the menus taller than they need to be. */
+.navbar .dropdown-menu li,
+.navbar .dropdown-menu li + li { padding: 0; margin: 0; border-top: 0; }
+
+.navbar .dropdown-item {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.navbar .dropdown-item:hover,
+.navbar .dropdown-item:focus { background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated)); color: var(--accent); }
+
+.lang-menu { padding: 0.3rem !important; min-width: 10.5rem; }
+.lang-menu .lang-menu-header { padding: 0.3rem 0.7rem 0.2rem; }
+.lang-menu .lang-option { padding: 0.5rem 0.7rem; border-radius: 8px; }
+
+@media (min-width: 992px) {
+  #settings-menu-panel { min-width: 290px !important; }
+  #settings-menu-panel select { min-width: 9.5rem; }
+}
+
+/* While the mobile menu is sliding open or shut it already looks like the finished
+   card, instead of popping its background and shadow in at the end. */
+@media (max-width: 991px) {
+  .navbar-collapse.collapsing {
+    background: color-mix(in srgb, var(--bg-elevated) 96%, transparent);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+    margin: 0.35rem -12px 0;
+    padding: 0.6rem 0.75rem 0.75rem;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+  }
+  .navbar .dropdown-menu { box-shadow: none; }
+}
+</style>
 {% block Styles %}{% endblock %}
 </head>
 
@@ -1599,7 +1810,7 @@ html.inverted .compdd-panel {
 <div class="collapse navbar-collapse" id="navbarSupportedContent">
 
 <ul class="navbar-nav me-auto">
-  {% if is_admin or 'scout_tech' in roles or 'admin' in roles or 'teacher' in roles %}
+  {% if is_team_member or 'scout_tech' in roles or 'teacher' in roles %}
   <li class="nav-item"><a class="nav-link" href="{% url 'scanner' %}" data-i18n="nav.scanner">QR Scanner</a></li>
   {% endif %}
   <li class="nav-item"><a class="nav-link" href="{% url 'teams' %}" data-i18n="nav.teams">Teams</a></li>
@@ -1610,7 +1821,7 @@ html.inverted .compdd-panel {
     <ul class="dropdown-menu">
       <li><a class="dropdown-item" href="{% url 'rankings' %}" data-i18n="nav.rankings">Rankings</a></li>
       <li><a class="dropdown-item" href="{% url 'dashboard' %}" data-i18n="nav.dashboard">Dashboard</a></li>
-      {% if is_admin or 'strategist' in roles or 'admin' in roles or 'teacher' in roles %}
+      {% if is_team_member or 'strategist' in roles or 'teacher' in roles %}
       <li><a class="dropdown-item" href="{% url 'picklist' %}" data-i18n="nav.picklist">Picklist</a></li>
       {% endif %}
     </ul>
@@ -1728,7 +1939,15 @@ html.inverted .compdd-panel {
 
 {% if request.session.name %}
 <div class="settings-user-header">
-  <div class="settings-user-avatar">{{ request.session.name|slice:":1" }}</div>
+  {# Hours-app picture; initial is the fallback if unset or the image fails. #}
+  <div class="settings-user-avatar" data-initial="{{ request.session.name|slice:':1' }}">
+    {% if user_avatar_url %}
+      <img src="{{ user_avatar_url }}" alt=""
+           onerror="this.remove();this.parentNode.classList.add('is-initial');">
+    {% else %}
+      {{ request.session.name|slice:":1" }}
+    {% endif %}
+  </div>
   <span style="font-size:0.8rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ request.session.name }}</span>
 </div>
 <hr class="settings-panel-divider">
@@ -2409,7 +2628,18 @@ window.t = function(key) {
         });
     }
 
+    function closeOtherDropdowns() {
+        document.querySelectorAll('[data-bs-toggle="dropdown"].show').forEach(function (t) {
+            var inst = window.bootstrap && window.bootstrap.Dropdown.getInstance(t);
+            if (inst) { inst.hide(); }
+        });
+    }
+
+    // Opening a Bootstrap dropdown (Strategy, language, settings) closes the alerts.
+    document.addEventListener('show.bs.dropdown', function () { if (panelOpen) closePanel(); });
+
     function openPanel() {
+        closeOtherDropdowns();
         panelOpen = true;
         panel.style.display = 'flex';
         // Mark all as read when panel opens
