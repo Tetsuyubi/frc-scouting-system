@@ -121,6 +121,12 @@ class UserProfile(models.Model):
     avatar_url = models.URLField(max_length=512, blank=True, default='')
     about = models.TextField(blank=True, default='')
 
+    # Free text rather than a fixed choice list: sets people do not use are
+    # common, and an "other" option that has to be explained is worse than a
+    # field that simply accepts what someone types. Blank means not stated,
+    # which is shown as nothing at all rather than a guess.
+    pronouns = models.CharField(max_length=40, blank=True, default='')
+
     def __str__(self):
         return f"{self.user.username} ({self.role})"
 

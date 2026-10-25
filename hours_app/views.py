@@ -39,6 +39,7 @@ def generate_qr_code(url, box_size=10, border=4):
 
 
 ABOUT_MAX_LENGTH = 280
+PRONOUNS_MAX_LENGTH = 40
 
 # Cloudinary is already the upload path for robot pictures in pit scouting,
 # so profile pictures use the same account rather than introducing storage.
@@ -115,6 +116,7 @@ def _profile_card(user, profile=None):
         'avatar_url': profile.avatar_url if profile else '',
         'initials': profile.initials if profile else (user.username or '?')[:2].upper(),
         'about': profile.about if profile else '',
+        'pronouns': profile.pronouns if profile else '',
         'badges': [b for b in badge_roster(earned) if b['earned']],
         'roster': badge_roster(earned),
         'earned_count': len(earned),
@@ -340,6 +342,9 @@ def profile(request):
         if action == 'remove_photo':
             prof.avatar_url = ''
             prof.save(update_fields=['avatar_url'])
+            # The scouting nav caches this in the session; drop it so the
+            # settings menu stops showing the old picture straight away.
+            request.session.pop('hours_avatar', None)
             messages.success(request, 'Profile picture removed.')
             return redirect('hours:profile')
 
@@ -353,6 +358,10 @@ def profile(request):
             about = about[:ABOUT_MAX_LENGTH]
         prof.about = about
 
+        # Whatever someone types is what gets stored; leaving it empty is a
+        # valid answer and renders as nothing rather than a placeholder.
+        prof.pronouns = request.POST.get('pronouns', '').strip()[:PRONOUNS_MAX_LENGTH]
+
         upload_error = None
         if request.FILES.get('avatar'):
             try:
@@ -360,7 +369,8 @@ def profile(request):
             except ValueError as exc:
                 upload_error = str(exc)
 
-        prof.save(update_fields=['subteams', 'about', 'avatar_url'])
+        prof.save(update_fields=['subteams', 'about', 'avatar_url', 'pronouns'])
+        request.session.pop('hours_avatar', None)
 
         if upload_error:
             # The text fields still saved, so say what did and did not work.
@@ -383,6 +393,7 @@ def profile(request):
         ],
         'selected_subteams': selected,
         'about_max_length': ABOUT_MAX_LENGTH,
+        'pronouns_max_length': PRONOUNS_MAX_LENGTH,
         'card': _profile_card(request.user, prof),
     })
 
@@ -573,6 +584,7 @@ def checked_in_users(request):
             'avatar_url': prof.avatar_url if prof else '',
             'initials': prof.initials if prof else (s.user.username or '?')[:2].upper(),
             'about': prof.about if prof else '',
+            'pronouns': prof.pronouns if prof else '',
         })
 
     return render(request, 'hours_app/checked_in.html', {

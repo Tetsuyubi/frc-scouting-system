@@ -1,5 +1,4 @@
 from .models import CheckInOut, SeasonRank
-import pandas as pd
 from django.contrib import admin, messages
 from django.urls import path
 from django.shortcuts import redirect, render
@@ -12,6 +11,10 @@ def perform_full_sync(request):
     excel_file = request.FILES.get("excel_file")
     if not excel_file:
         return False, "No file uploaded."
+
+    # Imported here, not at the top: pandas is slow to load and only this import
+    # needs it, but the admin module loads on every cold start.
+    import pandas as pd
 
     try:
         # 1. Clear Rankings for fresh start

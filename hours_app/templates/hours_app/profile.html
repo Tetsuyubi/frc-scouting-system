@@ -277,6 +277,25 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 .about-input::placeholder { color: var(--muted-text); }
+.pronouns-label {
+  display: block;
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.pronouns-optional {
+  margin-left: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted-text);
+}
+.pronouns-input {
+  min-height: 0;
+  height: auto;
+  margin-bottom: 0.9rem;
+  resize: none;
+}
 
 .char-count {
   display: flex;
@@ -421,6 +440,29 @@
       <!-- ============ About me ============ -->
       <p class="section-eyebrow">About Me</p>
       <p class="section-hint">A line or two about what you work on. Teammates see this on your profile.</p>
+
+      <!-- Free text with suggestions rather than a fixed dropdown, so sets
+           that are not listed can still be entered. Optional: left blank,
+           nothing is shown on the profile. -->
+      <label class="pronouns-label" for="pronouns-input">Pronouns <span class="pronouns-optional">optional</span></label>
+      <input
+        type="text"
+        class="about-input pronouns-input"
+        name="pronouns"
+        id="pronouns-input"
+        list="pronoun-suggestions"
+        maxlength="{{ pronouns_max_length }}"
+        autocomplete="off"
+        placeholder="e.g. she/her, he/him, they/them"
+        value="{{ profile.pronouns }}">
+      <datalist id="pronoun-suggestions">
+        <option value="she/her"></option>
+        <option value="he/him"></option>
+        <option value="they/them"></option>
+        <option value="she/they"></option>
+        <option value="he/they"></option>
+        <option value="any pronouns"></option>
+      </datalist>
 
       <textarea
         class="about-input"

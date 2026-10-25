@@ -399,6 +399,12 @@
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
+.about-pronouns {
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted-text);
+}
 .about-text {
   font-size: 0.86rem;
   line-height: 1.55;
@@ -1083,6 +1089,9 @@
       <!-- Col 3: About Me -->
       <div class="profile-col">
         <div class="stat-label">About Me</div>
+        {% if profile.pronouns %}
+          <p class="about-pronouns">{{ profile.pronouns }}</p>
+        {% endif %}
         {% if profile.about %}
           <p class="about-text">{{ profile.about }}</p>
         {% else %}

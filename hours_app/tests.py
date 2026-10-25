@@ -78,7 +78,7 @@ class UserAccessControlTestCase(TestCase):
         """Admins should be active, staff, and superuser."""
         user = User.objects.create_user(
             username='admin',
-            email='admin@example.com',
+            email='member@team2073.com',
             password='test123'
         )
         verify_user_access(None, user)
