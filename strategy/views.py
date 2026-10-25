@@ -14,7 +14,7 @@ from django.shortcuts import render
 
 from api.tba import get_single_match, get_teams_list, get_team_avatar, get_match_schedule, get_event_rankings
 from teams import models
-from helpers import login_required, role_required, per_match_values, match_count
+from helpers import login_required, team_member_required, per_match_values, match_count
 from django.shortcuts import render, redirect
 from strategy.models import PickList_Data
 from teams.models import Team_Match_Data, Teams
@@ -29,10 +29,13 @@ def get_json_path(comp_code):
     BASE_DIR = Path(__file__).resolve().parent.parent
     # Create a picklists directory if it doesn't exist
     picklist_dir = BASE_DIR / 'picklists'
-    picklist_dir.mkdir(exist_ok=True)
+    try:
+        picklist_dir.mkdir(exist_ok=True)
+    except OSError:
+        pass  # read-only host: reads still work, writes fall back to the database
     return picklist_dir / f'picklist_{comp_code}.json'
 
-def read_json_picklist(comp_code):
+def _read_picklist_file(comp_code):
     json_path = get_json_path(comp_code)
     if json_path is None:
         return None
@@ -49,16 +52,65 @@ def read_json_picklist(comp_code):
             return data
     return None
 
+
+def _read_picklist_db(comp_code):
+    """The saved board as a payload ([no, 1st, 2nd, 3rd, dnp, 4th]), if it has been saved."""
+    row = PickList_Data.objects.filter(event=comp_code).first()
+    if row is None or not row.updated_ms:
+        return None
+    def as_list(value):
+        return value if isinstance(value, list) else []
+    return {
+        'timestamp': row.updated_ms,
+        'data': [as_list(row.no_pick), as_list(row.first_pick), as_list(row.second_pick),
+                 as_list(row.third_pick), as_list(row.dn_pick), as_list(row.fourth_pick)],
+    }
+
+
+def read_json_picklist(comp_code):
+    """Latest board: the JSON file or the database row, whichever was saved last.
+
+    The file is the fast path for live sync. On a host with a read-only disk
+    it can only ever be a stale copy shipped with the code, so the database
+    wins whenever it is newer."""
+    if get_json_path(comp_code) is None:
+        return None
+    from_file = None
+    try:
+        from_file = _read_picklist_file(comp_code)
+    except (OSError, ValueError):
+        pass
+    from_db = None
+    try:
+        from_db = _read_picklist_db(comp_code)
+    except Exception:
+        logger.exception("could not read the picklist from the database")
+    if from_file and from_db:
+        return from_db if from_db['timestamp'] > from_file['timestamp'] else from_file
+    return from_file or from_db
+
 def write_json_picklist(comp_code, data):
+    """Save the board and return its timestamp (ms).
+
+    Always written to the database (that is what works on every host), and to
+    the JSON file as well when the disk is writable."""
     json_path = get_json_path(comp_code)
     if json_path is None:
         raise ValueError("Invalid competition code")
-    json_data = {
-        'timestamp': int(time() * 1000),  # Current time in milliseconds
-        'data': data
-    }
-    with open(json_path, 'w') as f:
-        json.dump(json_data, f)
+    stamp = int(time() * 1000)
+    padded = list(data) + [[]] * (6 - len(data))
+    PickList_Data.objects.get_or_create(event=comp_code)
+    PickList_Data.objects.filter(event=comp_code).update(
+        no_pick=padded[0], first_pick=padded[1], second_pick=padded[2],
+        third_pick=padded[3], dn_pick=padded[4], fourth_pick=padded[5],
+        updated_ms=stamp,
+    )
+    try:
+        with open(json_path, 'w') as f:
+            json.dump({'timestamp': stamp, 'data': data}, f)
+    except OSError:
+        pass  # read-only disk: the database copy above is the live one
+    return stamp
 
 @login_required
 def rankings(request):
@@ -172,7 +224,7 @@ def rankings(request):
     })
 
 @login_required
-@role_required('strategist')
+@team_member_required
 def picklist(request):
     comp_code = request.GET.get('comp')
     teams = []
@@ -180,6 +232,7 @@ def picklist(request):
     first_pick_teams = []
     second_pick_teams = []
     third_pick_teams = []
+    fourth_pick_teams = []
     dn_pick_teams = []
     if not comp_code or comp_code.lower() == 'testing':
         return render(request, "strategy/picklist.html", {
@@ -339,7 +392,9 @@ def picklist(request):
                 second_pick_teams = d[2] if len(d) > 2 else []
                 third_pick_teams  = d[3] if len(d) > 3 else []
                 dn_pick_teams     = d[4] if len(d) > 4 else []
-                all_saved = no_pick_teams + first_pick_teams + second_pick_teams + third_pick_teams + dn_pick_teams
+                fourth_pick_teams = d[5] if len(d) > 5 else []
+                all_saved = (no_pick_teams + first_pick_teams + second_pick_teams + third_pick_teams
+                             + dn_pick_teams + fourth_pick_teams)
                 categorized = set(str(t) for t in all_saved) | set(all_saved)
                 teams = [t for t in teams if str(t) not in categorized and t not in categorized]
             return render(request, "strategy/picklist.html", {
@@ -350,6 +405,7 @@ def picklist(request):
                 'first_pick_teams': first_pick_teams,
                 'second_pick_teams': second_pick_teams,
                 'third_pick_teams': third_pick_teams,
+                'fourth_pick_teams': fourth_pick_teams,
                 'dn_pick_teams': dn_pick_teams,
                 'team_info': team_info,
                 'filter_groups': filter_groups,
@@ -363,8 +419,10 @@ def picklist(request):
         second_pick_teams = picklist_data['second_pick'] if isinstance(picklist_data['second_pick'], list) else []
         third_pick_teams  = picklist_data['third_pick'] if isinstance(picklist_data['third_pick'], list) else []
         dn_pick_teams     = picklist_data['dn_pick'] if isinstance(picklist_data['dn_pick'], list) else []
+        fourth_pick_teams = picklist_data['fourth_pick'] if isinstance(picklist_data['fourth_pick'], list) else []
         # Any TBA team not in any saved list appears in the unassigned pool
-        all_saved = no_pick_teams + first_pick_teams + second_pick_teams + third_pick_teams + dn_pick_teams
+        all_saved = (no_pick_teams + first_pick_teams + second_pick_teams + third_pick_teams
+                     + dn_pick_teams + fourth_pick_teams)
         teams = _uncategorised(all_saved)
         return render(request, "strategy/picklist.html", {
             'teams': teams,
@@ -374,6 +432,7 @@ def picklist(request):
             'first_pick_teams': first_pick_teams,
             'second_pick_teams': second_pick_teams,
             'third_pick_teams': third_pick_teams,
+            'fourth_pick_teams': fourth_pick_teams,
             'dn_pick_teams': dn_pick_teams,
             'team_info': team_info,
             'filter_groups': filter_groups,
@@ -400,7 +459,7 @@ def read_picklist_flags(comp_code):
 
 
 @login_required
-@role_required('strategist')
+@team_member_required
 def picklist_flags(request):
     """
     Toggle a star or strike on one team.
@@ -449,11 +508,10 @@ def picklist_flags(request):
 
 
 @login_required
-@role_required('strategist')
+@team_member_required
 def picklist_submit(request):
     comp_code = request.GET.get('comp')
     client_timestamp = request.GET.get('timestamp', '0')
-    save_to_db = request.GET.get('save_to_db') == 'true'
 
     if request.method == 'POST':
         if not comp_code or not _SAFE_COMP_CODE.match(comp_code):
@@ -461,32 +519,21 @@ def picklist_submit(request):
         try:
             picklist_data = json.loads(request.body.decode('utf-8'))
 
-            if not isinstance(picklist_data, list) or len(picklist_data) != 5 or \
-                    not all(isinstance(slot, list) for slot in picklist_data):
+            # [no, 1st, 2nd, 3rd, dnp] from older pages, plus the 4th pick from current ones.
+            if (not isinstance(picklist_data, list) or len(picklist_data) not in (5, 6)
+                    or not all(isinstance(slot, list) for slot in picklist_data)):
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'Invalid picklist data: expected a list of exactly 5 lists'
+                    'message': 'Invalid picklist data: expected a list of 5 or 6 lists'
                 }, status=400)
 
-            # Save to JSON file first
-            write_json_picklist(comp_code, picklist_data)
-            
-            if save_to_db:
-                # Save to database
-                PickList_Data.objects.get_or_create(event=comp_code)
-                PickList_Data.objects.filter(event=comp_code).update(
-                    event=comp_code,
-                    no_pick=picklist_data[0],
-                    first_pick=picklist_data[1],
-                    second_pick=picklist_data[2],
-                    third_pick=picklist_data[3],
-                    dn_pick=picklist_data[4]
-                )
-            
+            # Saved to the database (and to the JSON file where the disk is writable).
+            stamp = write_json_picklist(comp_code, picklist_data)
+
             return JsonResponse({
                 'status': 'success',
                 'message': 'Data saved successfully',
-                'timestamp': int(time() * 1000)
+                'timestamp': stamp
             })
             
         except Exception:

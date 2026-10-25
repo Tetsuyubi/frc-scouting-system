@@ -17,8 +17,7 @@ class ScannerTests(TestCase):
         self.client.defaults['wsgi.url_scheme'] = 'https'
         session = self.client.session
         session['email'] = 'test@team2073.com'
-        # TEST-004: scanner() is gated by @role_required('scout_tech') — the fixture
-        # must carry that role or every request 403s regardless of what's being tested.
+        # scanner() is open to every @team2073.com account, whatever their role.
         session['role'] = 'scout_tech'
         session.save()
 
@@ -31,15 +30,23 @@ class ScannerTests(TestCase):
         view = resolve('/scanner/')
         self.assertEqual(view.func, scanner)
 
-    def test_scanner_view_rejects_wrong_role(self):
-        # TEST-004 negative case: prove the role gate actually rejects a session that
-        # doesn't carry 'scout_tech', rather than the earlier fixture accidentally
-        # passing because 'role' was never set at all.
+    def test_scanner_is_open_to_any_team_account(self):
+        # A plain student on a team email can use the scanner: no scout_tech role needed.
         session = self.client.session
         session['role'] = 'student'
         session.save()
-        url = reverse('scanner')
-        response = self.client.get(url, follow=True)
+        response = self.client.get(reverse('scanner'), follow=True)
+        self.assertEqual(response.status_code, 200)
+
+    def test_scanner_rejects_non_team_account(self):
+        # Negative case: the gate still rejects someone who is neither on the team
+        # domain nor an admin.
+        session = self.client.session
+        session['email'] = 'someone@gmail.com'
+        session['role'] = 'scout_tech'
+        session['is_admin'] = False
+        session.save()
+        response = self.client.get(reverse('scanner'), follow=True)
         self.assertEqual(response.status_code, 403)
 
     def test_scanner_post_creates_match_data(self):

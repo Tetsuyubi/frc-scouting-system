@@ -50,6 +50,33 @@ def role_required(*allowed_roles):
     return decorator
 
 
+TEAM_EMAIL_DOMAIN = '@team2073.com'
+
+
+def is_team_member(request):
+    """Signed in with a team email (any @team2073.com account), or an admin."""
+    email = (request.session.get('email') or '').lower()
+    return email.endswith(TEAM_EMAIL_DOMAIN) or bool(request.session.get('is_admin'))
+
+
+def team_member_required(function):
+    """Open to every @team2073.com account (and admins), whatever their role."""
+    @functools.wraps(function)
+    def wrapper(request, *args, **kw):
+        if not request.session.get('email'):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'error': 'Not authenticated'}, status=401)
+            return HttpResponseRedirect('/auth/')
+        if is_team_member(request):
+            return function(request, *args, **kw)
+        from django.shortcuts import render
+        return render(request, 'authenticate/unauthorized.html',
+                      {'email': request.session.get('email'),
+                       'role': request.session.get('role', 'student')},
+                      status=403)
+    return wrapper
+
+
 def rate_limit(max_calls, period_seconds):
     """
     Simple IP-based rate limiter using Django's cache.

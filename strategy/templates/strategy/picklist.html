@@ -153,9 +153,42 @@
 }
 
 @media (max-width: 640px) {
+    /* One column at a time, swiped left to right, instead of a 2-wide grid
+       that pushed the later picks into rows below the fold. Each column
+       snaps into place and the next one peeks in from the right so it is
+       obvious the board keeps going. */
     .picklist-board {
-        grid-template-columns: 1fr 1fr;
+        display: flex;
+        grid-template-columns: none;
+        overflow-x: auto;
+        align-items: start;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 0.5rem;
+        padding-bottom: 0.3rem;
     }
+    .picklist-board::-webkit-scrollbar { display: none; }
+
+    .picklist-col {
+        flex: 0 0 84%;
+        scroll-snap-align: start;
+    }
+
+    .lists { max-height: 64vh; }
+
+    /* A swipe scrolls the board; press and hold on a card starts a drag.
+       With touch-action:none (the desktop rule) every touch was claimed for
+       dragging, so the board could not be scrolled by touch at all. */
+    .picklist_teams { touch-action: pan-x pan-y; }
+
+    /* Once a card is in hand every touch belongs to the drag. Locking body
+       overflow here would also disable the drag's own vertical auto-scroll,
+       so the gesture is blocked at the card instead of at the page. */
+    body.is-dragging .picklist_teams { touch-action: none; }
+
+    /* Snap points fight the programmatic edge scroll mid-drag. */
+    body.is-dragging .picklist-board { scroll-snap-type: none; }
 }
 
 /* Column Header */
@@ -715,6 +748,83 @@ html.inverted {
     .picklist-filters { gap: 0.6rem; }
 }
 
+
+/* =========================
+   Optional columns + phone tabs
+   ========================= */
+.picklist-col[hidden] { display: none; }
+.col-fourth { background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated)); }
+
+.col-toggles { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.col-toggle { position: relative; margin: 0; cursor: pointer; }
+.col-toggle input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.col-toggle span {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 0.38rem 0.7rem; border-radius: 7px;
+    font-size: 0.8rem; font-weight: 600; white-space: nowrap;
+    color: var(--text); background: var(--card-bg, var(--bg-elevated));
+    border: 1px solid var(--border, #d8dde5);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.col-toggle span::before { content: "+"; font-weight: 800; }
+.col-toggle input:checked + span {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+}
+.col-toggle input:checked + span::before { content: "✓"; }
+.col-toggle input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.board-tabs { display: none; }
+
+@media (max-width: 640px) {
+    .board-tabs {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        margin: 0 -0.25rem 0.5rem;
+        padding: 0.35rem 0.25rem;
+        background: var(--bg);
+    }
+    .board-tabs::-webkit-scrollbar { display: none; }
+    .board-tab {
+        flex: 1 0 auto;
+        display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+        min-height: 36px; padding: 0 0.7rem;
+        font: inherit; font-size: 0.78rem; font-weight: 700; white-space: nowrap;
+        color: var(--muted-text); background: var(--bg-elevated);
+        border: 1px solid var(--border); border-radius: 999px;
+    }
+    .board-tab .tab-count { font-size: 0.68rem; opacity: 0.8; }
+    .board-tab[aria-current="true"] {
+        color: var(--accent);
+        border-color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated));
+    }
+    .picklist-toolbar .toolbar-left { flex-wrap: wrap; }
+
+    /* Less chrome above the board: the columns are what this page is for. */
+    .picklist-toolbar { gap: 0.4rem; margin-bottom: 0.35rem; }
+    .toolbar-left { gap: 0.3rem; }
+    .toolbar-btn, .col-toggle span {
+        min-height: 34px; padding: 0.25rem 0.55rem; font-size: 0.74rem;
+    }
+    .toolbar-right { justify-content: flex-end; }
+    .toolbar-right .sort-label { display: none; }
+    .toolbar-right .pool-sort { max-width: 100%; }
+    .picklist-header h2 { font-size: 1.45rem; margin-bottom: 0; }
+    .col-header { position: sticky; top: 0; z-index: 2; }
+
+    /* Fingertip-sized star / strike / select targets, side by side to save height. */
+    .card-flags { flex-direction: row; gap: 0; }
+    .flag-btn { width: 36px; height: 36px; opacity: 0.7; }
+    .picklist_teams input[type="checkbox"] { width: 24px; height: 24px; }
+}
+
 </style>
 {% endblock %}
 
@@ -754,6 +864,10 @@ html.inverted {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
                 Undo
             </button>
+            <span class="col-toggles" role="group" aria-label="Extra pick columns">
+                <label class="col-toggle"><input type="checkbox" id="toggle-3rd_pick"><span>3rd pick</span></label>
+                <label class="col-toggle"><input type="checkbox" id="toggle-4th_pick"><span>4th pick</span></label>
+            </span>
         </div>
         <div class="toolbar-right">
             <label class="sort-label" for="board-sort">Sort columns</label>
@@ -782,8 +896,11 @@ html.inverted {
         <button type="button" class="filter-clear" onclick="clearPicklistFilters()">Clear all</button>
     </div>
 
+    <!-- Phone: jump between columns (the board scrolls sideways) -->
+    <nav class="board-tabs" id="board-tabs" aria-label="Picklist columns"></nav>
+
     <!-- Kanban Board -->
-    <div class="picklist-board">
+    <div class="picklist-board" id="picklist-board">
 
         <!-- No Pick (unassigned pool) -->
         <div class="picklist-col">
@@ -873,9 +990,8 @@ html.inverted {
             </ol>
         </div>
 
-        <!-- Third Pick (conditional) -->
-        {% if comp_code == '2024cmptx' %}
-        <div class="picklist-col">
+        <!-- Third Pick (hidden until switched on in the toolbar, or when it has teams) -->
+        <div class="picklist-col" id="colwrap-3rd_pick" data-optional="3rd_pick" hidden>
             <div class="col-header col-third">
                 Third Pick
                 <span class="col-count" id="count-3rd_pick">0</span>
@@ -896,7 +1012,29 @@ html.inverted {
                 {% endfor %}
             </ol>
         </div>
-        {% endif %}
+
+        <!-- Fourth Pick (hidden until switched on in the toolbar, or when it has teams) -->
+        <div class="picklist-col" id="colwrap-4th_pick" data-optional="4th_pick" hidden>
+            <div class="col-header col-fourth">
+                Fourth Pick
+                <span class="col-count" id="count-4th_pick">0</span>
+            </div>
+            <ol class="lists" id="4th_pick" ondrop="onDrop(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)">
+                {% for team in fourth_pick_teams %}
+                    <li draggable="true" ondragstart="onDragStart(event)" class="picklist_teams" ondrop="onDrop(event)" ondragover="onDragOver(event)" id="{{ team }}" data-team="{{ team }}">
+                        <div class="team-card-inner">
+                            <div class="team-logo-placeholder js-logo-wrap"></div>
+                            <div class="team-text">
+                                <button class="team-number-btn" onclick="openTeamModal(event, {{ team }})" draggable="false">{{ team }}</button>
+                                <span class="team-nickname js-nickname"></span>
+                                <span class="team-stats js-stats"></span>
+                            </div>
+                        </div>
+                        <input type="checkbox" onchange="chosen(event)">
+                    </li>
+                {% endfor %}
+            </ol>
+        </div>
 
         <!-- Do Not Pick -->
         <div class="picklist-col">
@@ -1526,7 +1664,7 @@ window.buildStatChips = function (info) {
     /* Column counts. Cards hidden by an attribute filter are excluded, so the
        badge reflects what the strategist can actually see in the column. */
     function updateCounts() {
-        ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp'].forEach(function (id) {
+        ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp', '4th_pick'].forEach(function (id) {
             var list  = document.getElementById(id);
             var count = document.getElementById('count-' + id);
             if (!list || !count) return;
@@ -1554,7 +1692,7 @@ window.buildStatChips = function (info) {
     };
 
     /* Observe DOM changes in lists to update counts */
-    var listIds = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp'];
+    var listIds = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp', '4th_pick'];
     listIds.forEach(function (id) {
         var el = document.getElementById(id);
         if (!el) return;

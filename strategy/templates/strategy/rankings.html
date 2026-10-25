@@ -353,6 +353,16 @@ body.comfortable #rankings_table td {
 .pit-clear:hover {
     text-decoration: underline;
 }
+
+/* Phones: the controls wrap instead of forcing the page wider than the screen. */
+@media (max-width: 640px) {
+    .rankings-controls { flex-wrap: wrap; width: 100%; }
+    .rankings-controls select { flex: 1 1 calc(50% - 8px); min-width: 0; min-height: 38px; }
+    .rankings-controls select[name="min_matches"] { width: auto !important; }
+    .rankings-controls input[type="search"] { flex: 1 1 100%; width: 100%; min-height: 38px; box-sizing: border-box; }
+    .rankings-controls label { min-height: 38px; }
+    .rankings-controls input[type="checkbox"] { width: 20px; height: 20px; }
+}
 </style>
 {% endblock %}
 

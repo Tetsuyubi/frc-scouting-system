@@ -47,7 +47,7 @@ function sanitizeId(team) {
 
 // Temporary save (frequent updates)
 function saveTemporary() {
-    const lists = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp'];
+    const lists = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp', '4th_pick'];
     // Last line of defence before anything reaches the server. Skips the drag
     // placeholder (it has no id, which would otherwise save as an empty entry)
     // and drops any team already recorded in an earlier column, so a duplicate
@@ -85,7 +85,7 @@ function saveToDB() {
     const statusMessage = document.querySelector('.status-message');
     saveButton.disabled = true;
 
-    const lists = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp'];
+    const lists = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp', '4th_pick'];
     const data = lists.map(listId => 
         Array.from(document.getElementById(listId)?.children || [])
             .map(item => item.id)
@@ -302,7 +302,7 @@ function fetchUpdates() {
 
 // Update lists with new data
 function updateLists(data) {
-    const lists = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp'];
+    const lists = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp', '4th_pick'];
 
     lists.forEach((listId, index) => {
         const list = document.getElementById(listId);
@@ -331,7 +331,7 @@ function isDragBusy() {
 // saved picklist (duplicate ids also break getElementById lookups).
 function dedupeLists() {
     var seen = Object.create(null);
-    ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp'].forEach(function (listId) {
+    ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp', '4th_pick'].forEach(function (listId) {
         var list = document.getElementById(listId);
         if (!list) return;
         Array.prototype.slice.call(list.children).forEach(function (li) {
@@ -365,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
    competing for the same element fight each other).
    ========================================================================= */
 (function () {
-    var LIST_IDS   = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp'];
+    var LIST_IDS   = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp', '4th_pick'];
     var THRESHOLD  = 6;     // px before a press becomes a drag, so taps still click
     var EDGE       = 60;    // px from viewport edge that triggers auto-scroll
     var EDGE_SPEED = 12;
@@ -373,6 +373,14 @@ document.addEventListener('DOMContentLoaded', function() {
     var card = null, placeholder = null, dragging = false, pointerId = null;
     var startX = 0, startY = 0, grabX = 0, grabY = 0, scrollTimer = null;
     var lastX = 0, tilt = 0, hoverList = null, settling = false;
+
+    // Touch has to serve two gestures on the same surface: swiping the board
+    // sideways between columns, and picking a card up. A press that stays
+    // put for HOLD_MS becomes a drag; anything that moves first is a scroll
+    // and is handed back to the browser. Mouse and pen keep the old
+    // move-a-few-pixels behaviour, where there is no such ambiguity.
+    var HOLD_MS = 200, HOLD_SLOP = 10;
+    var isTouch = false, armed = false, holdTimer = null;
 
     function buzz(ms) {
         if (navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) {} }
@@ -446,6 +454,26 @@ document.addEventListener('DOMContentLoaded', function() {
         var rect = li.getBoundingClientRect();
         grabX = ev.clientX - rect.left;
         grabY = ev.clientY - rect.top;
+
+        isTouch = (ev.pointerType === 'touch');
+        armed = !isTouch;                 // mouse and pen are ready at once
+        clearTimeout(holdTimer);
+        if (isTouch) {
+            holdTimer = setTimeout(function () {
+                if (!card || dragging) return;
+                armed = true;
+                beginDrag();              // lift it under the finger straight away
+            }, HOLD_MS);
+        }
+    }
+
+    // The press turned out to be a scroll. Let go of the card entirely so the
+    // browser keeps the gesture.
+    function abandonPress() {
+        clearTimeout(holdTimer);
+        card = null;
+        pointerId = null;
+        armed = false;
     }
 
     function beginDrag() {
@@ -487,6 +515,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Place the placeholder in whichever list is under the pointer, at the
     // position matching the pointer's vertical offset.
     function reposition(x, y) {
+        // Called from the auto-scroll timer as well as from pointermove, so
+        // it can fire in the gap after a drop has released these.
+        if (!card || !placeholder) return;
         var under = document.elementFromPoint(x, y);
         if (!under) return;
 
@@ -522,14 +553,54 @@ document.addEventListener('DOMContentLoaded', function() {
         playFlip(boxes);
     }
 
-    function autoScroll(y) {
+    function board() { return document.querySelector('.picklist-board'); }
+
+    // Auto-scroll while a card is held near an edge. Vertical scrolls the
+    // page as before; horizontal scrolls the board, which is what makes it
+    // possible to carry a card from "No Pick" across to "Third Pick" on a
+    // phone, where only one column is on screen at a time.
+    function autoScroll(x, y) {
         clearInterval(scrollTimer);
-        var dir = 0;
-        if (y < EDGE) dir = -1;
-        else if (y > window.innerHeight - EDGE) dir = 1;
-        if (!dir) return;
+
+        var vdir = 0;
+        if (y < EDGE) vdir = -1;
+        else if (y > window.innerHeight - EDGE) vdir = 1;
+
+        // A column has its own scrollbar once it is taller than its cap, so
+        // near its top or bottom edge scroll the column rather than the page
+        // - otherwise a long list cannot be reordered while holding a card.
+        var col = hoverList;
+        var colScrolls = col && col.scrollHeight > col.clientHeight + 2;
+        var cdir = 0;
+        if (colScrolls) {
+            var cb = col.getBoundingClientRect();
+            if (y < cb.top + EDGE) cdir = -1;
+            else if (y > cb.bottom - EDGE) cdir = 1;
+            if (cdir) vdir = 0;           // the column takes priority
+        }
+
+        var hdir = 0;
+        var strip = board();
+        var scrollable = strip && strip.scrollWidth > strip.clientWidth + 2;
+        if (scrollable) {
+            var box = strip.getBoundingClientRect();
+            if (x < box.left + EDGE) hdir = -1;
+            else if (x > box.right - EDGE) hdir = 1;
+        }
+
+        if (!vdir && !hdir && !cdir) return;
         scrollTimer = setInterval(function () {
-            window.scrollBy(0, dir * EDGE_SPEED);
+            if (vdir) { window.scrollBy(0, vdir * EDGE_SPEED); }
+            if (cdir && col) {
+                col.scrollTop += cdir * EDGE_SPEED;
+                reposition(x, y);
+            }
+            if (hdir && strip) {
+                strip.scrollLeft += hdir * EDGE_SPEED;
+                // The pointer has not moved, but a different column is now
+                // underneath it, so the placeholder has to be re-placed.
+                reposition(x, y);
+            }
         }, 16);
     }
 
@@ -537,6 +608,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!card || ev.pointerId !== pointerId) return;
 
         if (!dragging) {
+            if (isTouch && !armed) {
+                // Moved before the hold completed, so this is a swipe.
+                if (Math.abs(ev.clientX - startX) > HOLD_SLOP ||
+                    Math.abs(ev.clientY - startY) > HOLD_SLOP) {
+                    abandonPress();
+                }
+                return;                   // no preventDefault: let it scroll
+            }
             if (Math.abs(ev.clientX - startX) < THRESHOLD &&
                 Math.abs(ev.clientY - startY) < THRESHOLD) return;
             beginDrag();
@@ -544,7 +623,7 @@ document.addEventListener('DOMContentLoaded', function() {
         ev.preventDefault();
         moveCard(ev.clientX, ev.clientY);
         reposition(ev.clientX, ev.clientY);
-        autoScroll(ev.clientY);
+        autoScroll(ev.clientX, ev.clientY);
     }
 
     // Drop the card into its slot by gliding it there, rather than teleporting.
@@ -614,6 +693,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function onPointerUp(ev) {
+        clearTimeout(holdTimer);
         if (!card || ev.pointerId !== pointerId) return;
         finish(false);
     }
@@ -621,6 +701,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // A cancelled pointer (ESC, browser gesture, lost capture) must still
     // restore the card - the old code had no equivalent and left it stuck.
     function onPointerCancel(ev) {
+        clearTimeout(holdTimer);
         if (!card || ev.pointerId !== pointerId) return;
         finish(true);
     }
@@ -656,7 +737,7 @@ document.addEventListener('DOMContentLoaded', function() {
    so a star set on one tablet shows up on every other one.
    ========================================================================= */
 (function () {
-    var LIST_IDS = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp'];
+    var LIST_IDS = ['no_pick', '1st_pick', '2nd_pick', '3rd_pick', 'dnp', '4th_pick'];
 
     function flags() {
         if (!window.PICKLIST_FLAGS) { window.PICKLIST_FLAGS = { starred: [], struck: [] }; }
@@ -1002,4 +1083,131 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else { init(); }
+})();
+
+
+/* =========================================================================
+   Extra pick columns (3rd, 4th) and the phone column tabs
+   -------------------------------------------------------------------------
+   3rd and 4th pick are off until switched on in the toolbar, and the choice
+   is remembered on this device. A column that holds teams is always shown: the
+   board is rebuilt from the server every few seconds, so hiding one that
+   another tablet just filled would make those teams disappear.
+
+   On a phone the board scrolls sideways one column at a time; the tab strip
+   jumps straight to a column and shows which one is in view.
+   ========================================================================= */
+(function () {
+    var OPTIONAL = ['3rd_pick', '4th_pick'];
+    var TABS = [
+        { id: 'no_pick',  label: 'No Pick' },
+        { id: '1st_pick', label: '1st' },
+        { id: '2nd_pick', label: '2nd' },
+        { id: '3rd_pick', label: '3rd' },
+        { id: '4th_pick', label: '4th' },
+        { id: 'dnp',      label: 'DNP' }
+    ];
+    var board, tabs, queued = false;
+
+    function wrapOf(id) { return document.getElementById('colwrap-' + id) || (document.getElementById(id) || {}).parentNode; }
+    function listOf(id) { return document.getElementById(id); }
+    function teamCount(id) {
+        var l = listOf(id);
+        return l ? l.querySelectorAll('.picklist_teams:not(.picklist-placeholder)').length : 0;
+    }
+    function key(id) { return 'picklistShow_' + id; }
+
+    function applyVisibility() {
+        OPTIONAL.forEach(function (id) {
+            var wrap = wrapOf(id), box = document.getElementById('toggle-' + id);
+            if (!wrap || !box) return;
+            var has = teamCount(id) > 0;
+            if (has) { box.checked = true; }
+            box.disabled = has;
+            box.title = has ? 'Move the teams out of this column to hide it' : '';
+            wrap.hidden = !box.checked;
+        });
+        buildTabs();
+    }
+
+    function visibleTabs() {
+        return TABS.filter(function (t) {
+            var w = wrapOf(t.id);
+            return w && !w.hidden;
+        });
+    }
+
+    function buildTabs() {
+        if (!tabs) return;
+        var list = visibleTabs();
+        tabs.innerHTML = '';
+        list.forEach(function (t) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'board-tab';
+            b.dataset.target = t.id;
+            b.innerHTML = t.label + ' <span class="tab-count">' + teamCount(t.id) + '</span>';
+            b.addEventListener('click', function () { goTo(t.id); });
+            tabs.appendChild(b);
+        });
+        markCurrent();
+    }
+
+    function goTo(id) {
+        var wrap = wrapOf(id);
+        if (!wrap || !board) return;
+        var left = wrap.getBoundingClientRect().left - board.getBoundingClientRect().left + board.scrollLeft;
+        board.scrollTo({ left: left, behavior: 'smooth' });
+    }
+
+    function markCurrent() {
+        if (!tabs || !board) return;
+        var best = null, bestDist = Infinity;
+        var origin = board.getBoundingClientRect().left;
+        visibleTabs().forEach(function (t) {
+            var d = Math.abs(wrapOf(t.id).getBoundingClientRect().left - origin);
+            if (d < bestDist) { bestDist = d; best = t.id; }
+        });
+        Array.prototype.forEach.call(tabs.children, function (b) {
+            var on = b.dataset.target === best;
+            if (on) { b.setAttribute('aria-current', 'true'); } else { b.removeAttribute('aria-current'); }
+            if (on && tabs.scrollWidth > tabs.clientWidth) {
+                tabs.scrollTo({ left: b.offsetLeft - 16, behavior: 'smooth' });
+            }
+        });
+    }
+
+    function schedule() {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(function () { queued = false; applyVisibility(); });
+    }
+
+    function init() {
+        board = document.getElementById('picklist-board');
+        tabs = document.getElementById('board-tabs');
+        if (!board) return;
+
+        OPTIONAL.forEach(function (id) {
+            var box = document.getElementById('toggle-' + id);
+            if (!box) return;
+            try { box.checked = localStorage.getItem(key(id)) === '1'; } catch (e) { /* default off */ }
+            box.addEventListener('change', function () {
+                try { localStorage.setItem(key(id), box.checked ? '1' : '0'); } catch (e) { /* still applies */ }
+                applyVisibility();
+                if (box.checked) { goTo(id); }
+            });
+        });
+
+        board.addEventListener('scroll', function () {
+            if (!queued) { queued = true; requestAnimationFrame(function () { queued = false; markCurrent(); }); }
+        }, { passive: true });
+
+        /* Counts and contents change as cards move and as the server refreshes the board. */
+        new MutationObserver(schedule).observe(board, { childList: true, subtree: true });
+        applyVisibility();
+    }
+
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
+    else { init(); }
 })();

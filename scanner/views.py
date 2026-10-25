@@ -7,14 +7,14 @@ logger = logging.getLogger(__name__)
 from teams.models import Teams, Team_Match_Data
 from plugins import plugin_manager
 from utils import config_loader
-from helpers import login_required, rate_limit, role_required
+from helpers import login_required, rate_limit, team_member_required
 
 
 _plugin_logger = logging.getLogger('plugins')
 
 @login_required
 @rate_limit(max_calls=60, period_seconds=60)
-@role_required('scout_tech')
+@team_member_required
 def scanner(request):
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
         try:
