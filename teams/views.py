@@ -769,6 +769,12 @@ CSV_ANCHOR_FIELDS = (
 )
 
 
+def _spreadsheet_safe_cell(value):
+    if isinstance(value, str) and value.lstrip(' \t\r\n\ufeff').startswith(('=', '+', '-', '@')):
+        return "'" + value
+    return value
+
+
 @login_required
 def export_matches_csv(request):
     """Download this competition's match data as a CSV.
@@ -810,7 +816,9 @@ def export_matches_csv(request):
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
     writer = csv.writer(response)
-    writer.writerow(['event'] + list(CSV_ANCHOR_FIELDS) + dynamic_cols)
+    writer.writerow(_spreadsheet_safe_cell(value) for value in (
+        ['event'] + list(CSV_ANCHOR_FIELDS) + dynamic_cols
+    ))
 
     for r in records:
         bucket = r.data if isinstance(r.data, dict) else {}
@@ -825,7 +833,7 @@ def export_matches_csv(request):
             elif isinstance(value, dict):
                 value = json.dumps(value)
             row.append(value)
-        writer.writerow(row)
+        writer.writerow(_spreadsheet_safe_cell(value) for value in row)
 
     return response
 

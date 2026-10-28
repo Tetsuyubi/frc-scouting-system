@@ -1,6 +1,9 @@
 import json
 import logging
-from django.http import JsonResponse
+import re
+from pathlib import Path
+
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
@@ -8,9 +11,24 @@ from teams.models import Teams, Team_Match_Data
 from plugins import plugin_manager
 from utils import config_loader
 from helpers import login_required, rate_limit, team_member_required
+from scanner.validation import validate_scan_data
 
 
 _plugin_logger = logging.getLogger('plugins')
+
+_SERVICE_WORKER = Path(__file__).resolve().parent / 'static' / 'scanner' / 'sw.js'
+
+
+def service_worker(request):
+    """The scanner's service worker, served from /scanner/ so its scope covers
+    the scanner page (a worker under /static/ could only control /static/)."""
+    response = HttpResponse(_SERVICE_WORKER.read_text(encoding='utf-8'),
+                            content_type='application/javascript')
+    # Browsers re-check the worker on navigation; never let a stale copy stick.
+    response['Cache-Control'] = 'no-cache'
+    response['Service-Worker-Allowed'] = '/scanner/'
+    return response
+
 
 @login_required
 @rate_limit(max_calls=60, period_seconds=60)
@@ -27,6 +45,16 @@ def scanner(request):
                     data_from_post = json.loads(data_from_post)
             else:
                 data_from_post = body_data
+            if not isinstance(data_from_post, dict):
+                return JsonResponse({"error": "Scan data must be an object"}, status=400)
+
+            is_valid, validation_errors = validate_scan_data(data_from_post)
+            if not is_valid:
+                return JsonResponse({
+                    "error": "; ".join(validation_errors),
+                    "validation_errors": validation_errors,
+                }, status=400)
+
             config = config_loader.get_config()
 
             # Extract anchor fields
@@ -34,14 +62,13 @@ def scanner(request):
                 team_num = int(data_from_post["teamNumber"])
                 event_code = str(data_from_post["comp_code"])
                 match_num = int(data_from_post["matchNumber"])
-                scout_name = str(data_from_post.get("name", ""))[:100]
+                scout_name = str(data_from_post.get("name", "")).strip()
                 comment = str(data_from_post.get("comment", ""))[:256]
             except (KeyError, ValueError, TypeError):
                 return JsonResponse({"error": "Missing or invalid field in submission"}, status=400)
 
             # Validate event_code format: alphanumeric + underscores/hyphens, max 20 chars
-            import re as _re
-            if not _re.match(r'^[A-Za-z0-9_\-]{1,20}$', event_code):
+            if not re.fullmatch(r'[A-Za-z0-9_-]{1,16}', event_code):
                 return JsonResponse({"error": "Invalid competition code format"}, status=400)
 
             # Ensure team exists
@@ -115,7 +142,10 @@ def scanner(request):
                         except (ValueError, TypeError):
                             data_bucket[key] = 0
                     elif metric['type'] == 'boolean':
-                        data_bucket[key] = bool(int(value)) if isinstance(value, (int, str)) else bool(value)
+                        if isinstance(value, str):
+                            data_bucket[key] = value.strip().lower() in ('1', 'true')
+                        else:
+                            data_bucket[key] = bool(value)
                     else:
                         data_bucket[key] = value
 

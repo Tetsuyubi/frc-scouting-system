@@ -2,6 +2,7 @@ from django.db import models
 
 class AuthorizedUser(models.Model):
     ROLE_CHOICES = [
+        ('admin',      'Administrator'),
         ('student',    'Student'),
         ('scout_tech', 'Scout Tech'),
         ('strategist', 'Strategist'),
@@ -14,7 +15,14 @@ class AuthorizedUser(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def get_roles_list(self):
-        return [r for r in self.roles.split(',') if r in self.VALID_ROLES]
+        return [
+            role for role in (r.strip() for r in self.roles.split(','))
+            if role in self.VALID_ROLES
+        ]
+
+    @property
+    def is_admin(self):
+        return 'admin' in self.get_roles_list()
 
     def __str__(self):
         return self.email

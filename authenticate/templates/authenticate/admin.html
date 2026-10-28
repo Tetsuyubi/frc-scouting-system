@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -308,6 +309,7 @@
         }
 
         .role-student    { background: #f9fafb; color: #6b7280; border: 1px solid #e5e7eb; }
+        .role-admin      { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
         .role-scout_tech { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
         .role-strategist { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
         .role-teacher    { background: #faf5ff; color: #7c3aed; border: 1px solid #e9d5ff; }
@@ -742,15 +744,114 @@
             body { flex-direction: column; }
         }
     </style>
+    <script>
+    /* Same preference key as the main site, applied before first paint. */
+    (function () {
+        try {
+            if (localStorage.getItem('inverted') === '1') document.documentElement.classList.add('inverted');
+        } catch (e) {}
+    })();
+    </script>
+    <style>
+        /* ─── THEME: match the main site, light and dark ─────────────── */
+        :root {
+            color-scheme: light;
+            --bg: #fafafa;
+            --bg-elevated: #ffffff;
+            --bg-subtle: #f3f3f3;
+            --text: #1a1a1a;
+            --text-secondary: #3a3a3a;
+            --muted-text: #666666;
+            --border: #e0e0e0;
+            --border-strong: #cfcfcf;
+            --accent-dim: color-mix(in srgb, var(--accent) 8%, transparent);
+            --sidebar-bg: var(--bg-elevated);
+            --sidebar-text: var(--muted-text);
+            --sidebar-hover: color-mix(in srgb, var(--accent) 7%, transparent);
+        }
+        html.inverted {
+            color-scheme: dark;
+            --bg: #121212;
+            --bg-elevated: #1e1e1e;
+            --bg-subtle: #262626;
+            --text: #f5f5f5;
+            --text-secondary: #d4d4d4;
+            --muted-text: #a0a0a0;
+            --accent: #FF4D4D;
+            --accent-hover: #FF6666;
+            --border: #333333;
+            --border-strong: #444444;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.25);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.38);
+            --shadow-lg: 0 20px 50px rgba(0,0,0,0.55);
+            --sidebar-bg: #171717;
+            scrollbar-color: #3a3a3a transparent;
+        }
+        html { background: var(--bg); }
+
+        /* Sidebar follows the theme instead of being permanently black. */
+        .sidebar { background: var(--sidebar-bg); border-right: 1px solid var(--border); }
+        .sidebar-brand { border-bottom-color: var(--border); }
+        .sidebar-brand-logo {
+            width: 40px; height: 40px; padding: 0;
+            background: none; border: none; border-radius: 8px;
+            filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--accent) 30%, transparent));
+        }
+        .sidebar-brand-name { color: var(--text); font-size: 14px; }
+        .sidebar-brand-name .wm-b { color: var(--accent); }
+        .sidebar-brand-sub { color: var(--muted-text); }
+        .sidebar-nav-label { color: color-mix(in srgb, var(--muted-text) 70%, transparent); }
+        .sidebar-link, .sidebar-footer .sidebar-link { color: var(--sidebar-text); }
+        .sidebar-link:hover { background: var(--sidebar-hover); color: var(--text); }
+        .sidebar-link.active { background: color-mix(in srgb, var(--accent) 11%, transparent); color: var(--accent); }
+        .sidebar-footer { border-top-color: var(--border); display: flex; flex-direction: column; gap: 2px; }
+
+        /* Status, role and permission chips: tinted from their hue so they read in both themes. */
+        .badge-enabled  { background: color-mix(in srgb, #22c55e 13%, transparent); color: #16a34a; border-color: color-mix(in srgb, #22c55e 35%, transparent); }
+        .badge-disabled { background: color-mix(in srgb, #ef4444 12%, transparent); color: #dc2626; border-color: color-mix(in srgb, #ef4444 35%, transparent); }
+        .role-student    { background: var(--bg-subtle); color: var(--muted-text); border-color: var(--border); }
+        .role-admin      { background: color-mix(in srgb, #f97316 13%, transparent); color: #ea580c; border-color: color-mix(in srgb, #f97316 35%, transparent); }
+        .role-scout_tech { background: color-mix(in srgb, #3b82f6 13%, transparent); color: #2563eb; border-color: color-mix(in srgb, #3b82f6 35%, transparent); }
+        .role-strategist { background: color-mix(in srgb, #22c55e 13%, transparent); color: #16a34a; border-color: color-mix(in srgb, #22c55e 35%, transparent); }
+        .role-teacher    { background: color-mix(in srgb, #a855f7 13%, transparent); color: #9333ea; border-color: color-mix(in srgb, #a855f7 35%, transparent); }
+        .perm-write  { background: color-mix(in srgb, #eab308 16%, transparent); color: #a16207; }
+        .perm-read   { background: color-mix(in srgb, #22c55e 13%, transparent); color: #16a34a; }
+        .perm-api    { background: color-mix(in srgb, #ef4444 12%, transparent); color: #dc2626; }
+        .perm-urls   { background: color-mix(in srgb, #3b82f6 13%, transparent); color: #2563eb; }
+        .perm-modify { background: color-mix(in srgb, #d946ef 13%, transparent); color: #c026d3; }
+        .btn-danger-ghost:hover { background: color-mix(in srgb, #ef4444 12%, transparent); }
+        html.inverted .badge-enabled, html.inverted .role-strategist, html.inverted .perm-read { color: #4ade80; }
+        html.inverted .badge-disabled, html.inverted .perm-api { color: #f87171; }
+        html.inverted .role-admin { color: #fb923c; }
+        html.inverted .role-scout_tech, html.inverted .perm-urls { color: #60a5fa; }
+        html.inverted .role-teacher { color: #c084fc; }
+        html.inverted .perm-write { color: #facc15; }
+        html.inverted .perm-modify { color: #e879f9; }
+        html.inverted .member-tag.has-photo { color: #fbbf24; }
+
+        html.inverted ::-webkit-scrollbar { width: 10px; height: 10px; }
+        html.inverted ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+        html.inverted ::-webkit-scrollbar-track, html.inverted ::-webkit-scrollbar-corner { background: transparent; }
+
+        .theme-toggle-btn .icon-sun { display: none; }
+        html.inverted .theme-toggle-btn .icon-sun { display: inline; }
+        html.inverted .theme-toggle-btn .icon-moon { display: none; }
+
+        @media (max-width: 768px) {
+            .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+            .sidebar-brand { border-right-color: var(--border); }
+            .sidebar-footer { border-left-color: var(--border); flex-direction: row; }
+        }
+    </style>
 </head>
 <body>
 
     <!-- ─── SIDEBAR ──────────────────────────────────────────────────────── -->
     <aside class="sidebar">
         <div class="sidebar-brand">
-            <img src="{{ logo_url }}" alt="Logo" class="sidebar-brand-logo" id="sidebar-logo">
+            <a href="/" aria-label="Back to the app"><img src="{% static 'images/logo.png' %}" alt="Team 2073 logo" class="sidebar-brand-logo" id="sidebar-logo"></a>
             <div class="sidebar-brand-text">
-                <span class="sidebar-brand-name">Admin Panel</span>
+                <span class="sidebar-brand-name">Eagle<span class="wm-b">Scout</span> Admin</span>
                 <span class="sidebar-brand-sub">EagleForce 2073</span>
             </div>
         </div>
@@ -785,6 +886,27 @@
         </nav>
 
         <div class="sidebar-footer">
+            <button type="button" class="sidebar-link theme-toggle-btn" id="admin-theme-toggle">
+                <svg class="sidebar-link-icon icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <svg class="sidebar-link-icon icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                <span class="theme-toggle-label">Dark mode</span>
+            </button>
+            <script>
+            (function () {
+                var btn = document.getElementById('admin-theme-toggle');
+                var label = btn.querySelector('.theme-toggle-label');
+                function sync() {
+                    label.textContent = document.documentElement.classList.contains('inverted') ? 'Light mode' : 'Dark mode';
+                }
+                btn.addEventListener('click', function () {
+                    var on = !document.documentElement.classList.contains('inverted');
+                    document.documentElement.classList.toggle('inverted', on);
+                    try { localStorage.setItem('inverted', on ? '1' : '0'); } catch (e) {}
+                    sync();
+                });
+                sync();
+            })();
+            </script>
             <a href="/" class="sidebar-link">
                 <svg class="sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                 Back to App
@@ -829,6 +951,7 @@
                             <option value="scout_tech">Scout Tech</option>
                             <option value="strategist">Strategist</option>
                             <option value="teacher">Teacher</option>
+                            <option value="admin">Administrator</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -1299,12 +1422,10 @@
         const input = document.getElementById('logo_url');
         const img   = document.getElementById('logo_preview_img');
         const link  = document.getElementById('logo_preview_link');
-        const sidebarLogo = document.getElementById('sidebar-logo');
         if (input && img && link) {
             input.addEventListener('input', function() {
                 const val = this.value.trim();
                 img.src = val; link.href = val;
-                if (sidebarLogo) sidebarLogo.src = val;
             });
         }
     })();

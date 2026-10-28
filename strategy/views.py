@@ -544,6 +544,8 @@ def picklist_submit(request):
             }, status=500)
 
     elif request.method == 'GET':
+        if not comp_code or not _SAFE_COMP_CODE.match(comp_code):
+            return JsonResponse({'status': 'error', 'message': 'Invalid or missing competition code'}, status=400)
         json_data = read_json_picklist(comp_code)
         
         if not json_data:

@@ -13,18 +13,19 @@ from teams.models import Team_Match_Data
 
 class AdminAuthFixtureMixin:
     """Shared session/DB setup for an authorized admin-panel user.
-
-    `admin_required` (authenticate/views_admin.py) grants access to any session
-    whose email has a matching AuthorizedUser row — no role check involved.
     """
 
     def _make_admin_client(self):
         client = Client()
         client.defaults['HTTP_HOST'] = 'localhost'
         client.defaults['wsgi.url_scheme'] = 'https'
-        AuthorizedUser.objects.get_or_create(email='admin@team2073.com')
+        AuthorizedUser.objects.get_or_create(
+            email='admin@team2073.com',
+            defaults={'roles': 'admin'},
+        )
         session = client.session
         session['email'] = 'admin@team2073.com'
+        session['is_admin'] = True
         session.save()
         return client
 
@@ -142,6 +143,64 @@ class RemoveUserTests(AdminAuthFixtureMixin, TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 405)
         self.assertTrue(AuthorizedUser.objects.filter(id=self.target.id).exists())
+
+    def test_non_admin_role_cannot_remove_users_even_with_stale_admin_session(self):
+        student = AuthorizedUser.objects.create(
+            email='student@example.com',
+            roles='student',
+        )
+        client = Client()
+        client.defaults['HTTP_HOST'] = 'localhost'
+        session = client.session
+        session['email'] = student.email
+        session['role'] = 'student'
+        session['is_admin'] = True
+        session.save()
+
+        response = client.post(reverse('remove_user', kwargs={'user_id': self.target.id}))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, '/auth/unauthorized/')
+        self.assertTrue(AuthorizedUser.objects.filter(id=self.target.id).exists())
+
+    def test_last_admin_cannot_be_removed(self):
+        admin = AuthorizedUser.objects.get(email='admin@team2073.com')
+
+        response = self.client.post(reverse('remove_user', kwargs={'user_id': admin.id}))
+
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(AuthorizedUser.objects.filter(id=admin.id).exists())
+
+    def test_last_admin_cannot_be_demoted(self):
+        admin = AuthorizedUser.objects.get(email='admin@team2073.com')
+
+        response = self.client.post(
+            reverse('update_user_role', kwargs={'user_id': admin.id}),
+            data={'roles': ['teacher']},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        admin.refresh_from_db()
+        self.assertTrue(admin.is_admin)
+
+
+class AdminRequiredRoleTests(TestCase):
+    def test_authorized_student_cannot_access_admin_panel(self):
+        student = AuthorizedUser.objects.create(
+            email='student@example.com',
+            roles='student',
+        )
+        client = Client()
+        client.defaults['HTTP_HOST'] = 'localhost'
+        session = client.session
+        session['email'] = student.email
+        session['role'] = 'student'
+        session.save()
+
+        response = client.get(reverse('admin_panel'))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, '/auth/unauthorized/')
 
 
 class HoursCheckoutAllTests(AdminAuthFixtureMixin, TestCase):

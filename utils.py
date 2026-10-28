@@ -1,4 +1,5 @@
 import json
+import math
 import os
 from pathlib import Path
 from threading import Lock
@@ -60,6 +61,8 @@ class ConfigLoader:
         if metric['type'] == 'number':
             try:
                 value = float(value)
+                if not math.isfinite(value):
+                    return False, f"{metric_key} must be a finite number"
                 if 'min' in metric and value < metric['min']:
                     return False, f"{metric_key} below minimum ({metric['min']})"
                 if 'max' in metric and value > metric['max']:

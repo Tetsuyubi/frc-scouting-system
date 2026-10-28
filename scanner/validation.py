@@ -1,6 +1,20 @@
 """
 Shared validation utilities for scanner data
 """
+import re
+
+_COMP_CODE_PATTERN = re.compile(r'^[A-Za-z0-9_-]{1,16}$')
+
+
+def _integer_value(value):
+    if isinstance(value, bool):
+        raise ValueError
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    raise ValueError
+
 
 def validate_scan_data(scan_data):
     """
@@ -8,6 +22,8 @@ def validate_scan_data(scan_data):
     Returns tuple (is_valid, errors_list)
     """
     errors = []
+    if not isinstance(scan_data, dict):
+        return False, ['Scan data must be an object']
     
     # Required fields validation
     required_fields = {
@@ -23,7 +39,7 @@ def validate_scan_data(scan_data):
     
     # Team number validation
     try:
-        team_num = int(scan_data.get('teamNumber', 0))
+        team_num = _integer_value(scan_data.get('teamNumber', 0))
         if team_num <= 0 or team_num > 99999:
             errors.append("Team number must be between 1 and 99999")
     except (ValueError, TypeError):
@@ -31,7 +47,7 @@ def validate_scan_data(scan_data):
     
     # Match number validation
     try:
-        match_num = int(scan_data.get('matchNumber', 0))
+        match_num = _integer_value(scan_data.get('matchNumber', 0))
         if match_num <= 0 or match_num > 999:
             errors.append("Match number must be between 1 and 999")
     except (ValueError, TypeError):
@@ -39,30 +55,25 @@ def validate_scan_data(scan_data):
     
     # Scout name validation
     name = str(scan_data.get('name', '')).strip()
-    if len(name) < 2:
-        errors.append("Scout name must be at least 2 characters")
-    elif len(name) > 32:
+    if len(name) > 32:
         errors.append("Scout name cannot exceed 32 characters")
     
     # Competition code validation
     comp_code = str(scan_data.get('comp_code', '')).strip()
-    if len(comp_code) < 3:
-        errors.append("Competition code must be at least 3 characters")
-    elif len(comp_code) > 16:
-        errors.append("Competition code cannot exceed 16 characters")
+    if not _COMP_CODE_PATTERN.fullmatch(comp_code):
+        errors.append("Competition code must contain 1 to 16 letters, digits, underscores or hyphens")
     
     # Validate numeric fields with reasonable bounds
     numeric_fields = {
         'startPos': (0, 4),
-        'driverRanking': (1, 5),
-        'defenseRanking': (1, 5),
-        'endClimb': (0, 4)
+        'driverRanking': (0, 5),
+        'defenseRanking': (0, 5),
     }
     
     for field, (min_val, max_val) in numeric_fields.items():
         if field in scan_data:
             try:
-                val = int(scan_data[field])
+                val = _integer_value(scan_data[field])
                 if val < min_val or val > max_val:
                     errors.append(f"{field} must be between {min_val} and {max_val}")
             except (ValueError, TypeError):
@@ -73,7 +84,7 @@ def validate_scan_data(scan_data):
     for field in boolean_fields:
         if field in scan_data:
             try:
-                val = int(scan_data[field])
+                val = _integer_value(scan_data[field])
                 if val not in [0, 1]:
                     errors.append(f"{field} must be 0 or 1")
             except (ValueError, TypeError):

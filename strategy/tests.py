@@ -1,5 +1,7 @@
 import json
 
+from django.db import IntegrityError, transaction
+
 from django.test import TestCase
 from django.urls import reverse
 
@@ -84,6 +86,15 @@ class PicklistSubmitTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertFalse(self.json_path.exists())
+
+
+class PicklistUniqueEventTests(TestCase):
+    """One PickList_Data row per event, so concurrent saves can't fork the board."""
+
+    def test_second_row_for_same_event_is_rejected(self):
+        PickList_Data.objects.create(event='uniqueevent2026')
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            PickList_Data.objects.create(event='uniqueevent2026')
 
 
 class DoubleScoutedMatchAveragingTests(TestCase):

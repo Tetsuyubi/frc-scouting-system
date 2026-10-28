@@ -4,6 +4,7 @@ from django.test import TestCase
 
 # Create your tests here.
 from django.urls import reverse, resolve
+from authenticate.models import AuthorizedUser
 from .views import scanner
 from teams.models import Team_Match_Data
 
@@ -15,6 +16,10 @@ class ScannerTests(TestCase):
         self.client.defaults['HTTP_HOST'] = 'localhost'
         # Make requests appear secure so SECURE_SSL_REDIRECT doesn't force https redirects
         self.client.defaults['wsgi.url_scheme'] = 'https'
+        AuthorizedUser.objects.get_or_create(
+            email='test@team2073.com',
+            defaults={'roles': 'scout_tech'},
+        )
         session = self.client.session
         session['email'] = 'test@team2073.com'
         # scanner() is open to every @team2073.com account, whatever their role.

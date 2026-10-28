@@ -740,40 +740,6 @@ html.inverted .dash-table-wrap {
 })();
 </script>
 
-<!-- Alert polling: pushes broken-robot reports into the global bell system -->
-<script>
-(function () {
-    'use strict';
-
-    var compCode = new URLSearchParams(window.location.search).get('comp') || '';
-    if (!compCode || compCode === 'testing') return;
-
-    var lastAlertId = 0;
-
-    function pollAlerts() {
-        fetch('/api/alerts/?comp=' + encodeURIComponent(compCode) + '&since_id=' + lastAlertId, {
-            credentials: 'same-origin',
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-        })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (data) {
-            if (!data || !Array.isArray(data.alerts) || !data.alerts.length) return;
-            lastAlertId = data.latest_id;
-            data.alerts.forEach(function (a) {
-                window.pushBellAlert && window.pushBellAlert({
-                    id:      a.id,
-                    message: 'Team ' + a.team_number + ' reported BROKEN — Match ' + a.match_number + ' (by ' + a.scout_name + ')',
-                    ts:      Date.now(),
-                    read:    false,
-                });
-            });
-        })
-        .catch(function () {});
-    }
-
-    setTimeout(function () { pollAlerts(); setInterval(pollAlerts, 8000); }, 2000);
-})();
-</script>
 
 <!-- ================================================================
      Simulation panel JavaScript

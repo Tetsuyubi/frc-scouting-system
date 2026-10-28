@@ -39,33 +39,17 @@ def config_context(request):
     except Exception:
         settings = None
 
-    # Resolve is_admin: use cached session value if present, otherwise check DB.
-    # This handles existing sessions that predate the is_admin session key.
-    is_admin = request.session.get('is_admin')
-    if is_admin is None:
-        email = request.session.get('email')
-        if email:
-            try:
-                is_admin = AuthorizedUser.objects.filter(email=email).exists()
-            except Exception:
-                is_admin = False
-            # Cache it so subsequent requests skip the DB query
-            request.session['is_admin'] = is_admin
-        else:
-            is_admin = False
-
-    role = request.session.get('role')
-    if role is None:
-        email = request.session.get('email')
-        if email:
-            try:
-                au = AuthorizedUser.objects.filter(email=email).first()
-                role = au.roles if au else 'student'
-            except Exception:
-                role = 'student'
-            request.session['role'] = role
-        else:
-            role = None
+    email = request.session.get('email')
+    is_admin = False
+    role = None
+    if email:
+        try:
+            authorized_user = AuthorizedUser.objects.filter(email__iexact=email).first()
+            roles = authorized_user.get_roles_list() if authorized_user else []
+            role = ','.join(roles) or 'student'
+            is_admin = bool(authorized_user and authorized_user.is_admin)
+        except Exception:
+            role = 'student'
 
     return {
         'app_name': config.get('app_name', 'Scouting System'),

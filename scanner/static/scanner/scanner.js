@@ -85,6 +85,52 @@ var OUTBOX_KEY = 'scanner_outbox_v1';
 var OUTBOX_MAX = 500;
 var flushing   = false;
 
+// ── Online / offline mode ─────────────────────────────
+// Online: every scan is sent as soon as it is read (and queued if that fails).
+// Offline: scans go straight into the outbox with no network attempt, for
+// stands with no usable wi-fi. Switching back to online uploads the queue.
+var MODE_KEY = 'scanner_mode';
+
+function scanMode() {
+    try { return localStorage.getItem(MODE_KEY) === 'offline' ? 'offline' : 'online'; }
+    catch (e) { return 'online'; }
+}
+
+function setScanMode(mode) {
+    try { localStorage.setItem(MODE_KEY, mode); } catch (e) {}
+    syncModeUI();
+    if (mode === 'online') {
+        flushOutbox();
+    } else {
+        setFeedback('queued', 'Offline mode: scans are saved on this device');
+    }
+}
+
+function syncModeUI() {
+    var mode = scanMode();
+    document.querySelectorAll('[data-scan-mode]').forEach(function (b) {
+        var on = b.getAttribute('data-scan-mode') === mode;
+        b.classList.toggle('is-active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    var page = document.querySelector('.scanner-page');
+    if (page) page.classList.toggle('is-offline-mode', mode === 'offline');
+    var hint = document.getElementById('scan-mode-hint');
+    if (hint) {
+        hint.textContent = mode === 'offline'
+            ? 'Scans are stored on this device. Switch to Online or tap Upload when you have wi-fi.'
+            : (navigator.onLine ? 'Scans upload as soon as they are read.'
+                                : 'No connection: scans will queue and upload when wi-fi returns.');
+    }
+}
+
+document.querySelectorAll('[data-scan-mode]').forEach(function (b) {
+    b.addEventListener('click', function () { setScanMode(b.getAttribute('data-scan-mode')); });
+});
+window.addEventListener('online', syncModeUI);
+window.addEventListener('offline', syncModeUI);
+syncModeUI();
+
 function outboxRead() {
     try { return JSON.parse(localStorage.getItem(OUTBOX_KEY)) || []; }
     catch (e) { return []; }
@@ -104,11 +150,17 @@ function outboxAdd(entry) {
 
 function updateOutboxBadge() {
     var el = document.getElementById('outbox-badge');
-    if (!el) return;
+    var up = document.getElementById('outbox-upload');
     var n = outboxRead().length;
-    if (!n) { el.hidden = true; return; }
-    el.hidden = false;
-    el.textContent = n + ' scan' + (n === 1 ? '' : 's') + ' queued offline';
+    if (el) {
+        el.hidden = !n;
+        el.textContent = n + ' scan' + (n === 1 ? '' : 's') + ' saved on this device';
+    }
+    if (up) {
+        up.hidden = !n;
+        up.disabled = flushing;
+        up.textContent = flushing ? 'Uploading…' : 'Upload ' + n + ' now';
+    }
 }
 
 // Resolves on success. Rejects with err.retryable set when the scan should be
@@ -155,6 +207,17 @@ function sendScan(qrData) {
 
 // ── Server POST ───────────────────────────────────────
 function post_data_to_server(data, scouterName, teamNum, matchNum) {
+    if (scanMode() === 'offline') {
+        outboxAdd({
+            qr_data: data, scout: scouterName,
+            team: teamNum, match: matchNum, ts: Date.now()
+        });
+        setFeedback('queued', 'Saved offline — ' + (scouterName || 'Unknown'));
+        vibrateOnSuccess(150);
+        addToHistory(scouterName, teamNum, matchNum, 'queued');
+        return;
+    }
+
     setFeedback('sending', 'Sending…');
 
     sendScan(data)
@@ -188,6 +251,7 @@ function flushOutbox() {
     if (!items.length) return Promise.resolve();
 
     flushing = true;
+    updateOutboxBadge();
     var remaining = items.slice();
 
     function step() {
@@ -220,9 +284,20 @@ function flushOutbox() {
     });
 }
 
-window.addEventListener('online', flushOutbox);
-window.addEventListener('load', function () { updateOutboxBadge(); flushOutbox(); });
-setInterval(function () { if (navigator.onLine) flushOutbox(); }, 30000);
+// Automatic uploads only happen in online mode; offline mode waits for the
+// Upload button or a switch back to online.
+function autoFlush() { if (scanMode() === 'online' && navigator.onLine) flushOutbox(); }
+window.addEventListener('online', autoFlush);
+window.addEventListener('load', function () { updateOutboxBadge(); autoFlush(); });
+setInterval(autoFlush, 30000);
+
+var uploadBtn = document.getElementById('outbox-upload');
+if (uploadBtn) uploadBtn.addEventListener('click', function () { flushOutbox(); });
+
+// Let the page open without wi-fi next time (see /scanner/sw.js).
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/scanner/sw.js', { scope: '/scanner/' }).catch(function () {});
+}
 
 // ── Feedback indicator ────────────────────────────────
 function setFeedback(state, text) {

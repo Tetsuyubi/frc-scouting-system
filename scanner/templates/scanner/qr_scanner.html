@@ -15,7 +15,7 @@
     display: grid;
     /* minmax(0,1fr) prevents long text in the card from stretching the column */
     grid-template-columns: minmax(0, 1fr) 320px;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
     gap: 1rem;
 }
 
@@ -159,6 +159,33 @@ html.inverted .scanner-card {
     background: rgba(245,158,11,0.15); color: #b45309;
 }
 #outbox-badge[hidden] { display: none; }
+
+/* Online / offline mode switch */
+.scan-mode {
+    display: inline-flex; padding: 3px; gap: 2px;
+    border-radius: 999px; border: 1px solid var(--border);
+    background: var(--bg-elevated);
+}
+.scan-mode-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border: none; border-radius: 999px;
+    background: transparent; color: var(--muted-text);
+    font-size: 0.82rem; font-weight: 700; cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+.scan-mode-btn:hover { color: var(--text); }
+.scan-mode-btn.is-active[data-scan-mode="online"]  { background: #16a34a; color: #fff; }
+.scan-mode-btn.is-active[data-scan-mode="offline"] { background: #d97706; color: #fff; }
+.scan-mode-hint { grid-column: 1 / -1; margin: -0.25rem 0 0; font-size: 0.78rem; color: var(--muted-text); }
+.scanner-page.is-offline-mode #video-container { box-shadow: 0 0 0 3px #d97706; }
+.outbox-upload {
+    margin-top: 0.5rem; padding: 0.35rem 0.85rem;
+    border: none; border-radius: 999px;
+    background: var(--accent); color: #fff;
+    font-size: 0.78rem; font-weight: 700; cursor: pointer;
+}
+.outbox-upload[hidden] { display: none; }
+.outbox-upload:disabled { opacity: 0.6; cursor: progress; }
 html.inverted .feedback-queued,
 html.inverted #outbox-badge { color: #fbbf24; }
 .feedback-idle    { background: var(--border); color: var(--muted-text); }
@@ -362,7 +389,18 @@ html.inverted .history-success .h-icon { color: #4ade80; }
     <!-- Header -->
     <div class="scanner-page-header">
         <h2>QR Scanner</h2>
+        <div class="scan-mode" role="group" aria-label="Scanning mode">
+            <button type="button" class="scan-mode-btn" data-scan-mode="online" aria-pressed="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                Online
+            </button>
+            <button type="button" class="scan-mode-btn" data-scan-mode="offline" aria-pressed="false">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                Offline
+            </button>
+        </div>
     </div>
+    <p id="scan-mode-hint" class="scan-mode-hint" aria-live="polite"></p>
 
     <!-- Camera + feedback -->
     <div class="scanner-card">
@@ -378,6 +416,7 @@ html.inverted .history-success .h-icon { color: #4ade80; }
             <span id="cam-qr-result">—</span>
             <span id="scan-feedback" class="scan-feedback-text feedback-idle" aria-live="polite">Ready</span>
             <span id="outbox-badge" aria-live="polite" hidden></span>
+            <button type="button" id="outbox-upload" class="outbox-upload" hidden>Upload now</button>
         </div>
 
         <!-- Controls -->

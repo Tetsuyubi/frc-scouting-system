@@ -30,12 +30,14 @@ client_config = {
         "redirect_uris": [
             "http://localhost:8000/auth/oauth2callback/",
             "http://127.0.0.1:8000/auth/oauth2callback/",
+            "https://scouting.team2073.com/auth/oauth2callback/",
             "https://scouting.chrisccluk.live/auth/oauth2callback/",
             "https://scout.chrisccluk.live/auth/oauth2callback/"
         ],
         "javascript_origins": [
             "http://localhost:8000",
             "http://127.0.0.1:8000",
+            "https://scouting.team2073.com",
             "https://scouting.chrisccluk.live",
             "https://scout.chrisccluk.live"
         ]
@@ -126,22 +128,16 @@ def oauth2callback(request):
     if not email:
         return render(request, 'authenticate/unauthorized.html', {'email': 'Login failed — please try again'})
 
-    # Check database for authorization - database is the single source of truth.
-    # @team2073.com domain is still accepted as a fallback for team members not yet added.
-    is_admin = AuthorizedUser.objects.filter(email=email).exists()
-    if is_admin or email.endswith('@team2073.com'):
+    email = email.strip().lower()
+    authorized_user = AuthorizedUser.objects.filter(email__iexact=email).first()
+    if authorized_user or email.endswith('@team2073.com'):
         is_authorized = True
     else:
         return render(request, 'authenticate/unauthorized.html', {'email': email})
 
-    # Resolve roles from DB if user is in the table, else default to 'student'
-    role = 'student'
-    if is_admin:
-        try:
-            au = AuthorizedUser.objects.get(email=email)
-            role = au.roles or 'student'
-        except Exception:
-            role = 'student'
+    roles = authorized_user.get_roles_list() if authorized_user else []
+    role = ','.join(roles) or 'student'
+    is_admin = bool(authorized_user and authorized_user.is_admin)
 
     request.session["email"] = email
     request.session["is_authorized"] = is_authorized

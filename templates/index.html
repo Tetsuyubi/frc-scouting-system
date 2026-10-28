@@ -53,7 +53,12 @@
   --bg-subtle: color-mix(in srgb, var(--bg-elevated) 55%, var(--bg));
 }
 
+html { color-scheme: light; background: var(--bg); }
+
 html.inverted {
+  /* Dark native widgets: scrollbars, checkboxes, date pickers and selects
+     otherwise stay white because the browser still thinks the page is light. */
+  color-scheme: dark;
   --bg: #121212;
   --bg-elevated: #1e1e1e;
   --text: #f5f5f5;
@@ -65,6 +70,19 @@ html.inverted {
   --shadow-md: 0 4px 16px rgba(0,0,0,0.38);
   --shadow-lg: 0 20px 50px rgba(0,0,0,0.55);
 }
+
+/* Scrollbars follow the theme. Firefox and Chrome 121+ read scrollbar-color
+   (inherited, so it reaches every scrolling box); Safari only knows the
+   ::-webkit-scrollbar pseudo-elements. */
+html.inverted { scrollbar-color: #3a3a3a transparent; }
+html.inverted ::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
+html.inverted ::-webkit-scrollbar-track { background: transparent; }
+html.inverted ::-webkit-scrollbar-thumb {
+  background: #3a3a3a; border-radius: 999px;
+  border: 2px solid transparent; background-clip: padding-box;
+}
+html.inverted ::-webkit-scrollbar-thumb:hover { background-color: #505050; }
+html.inverted ::-webkit-scrollbar-corner { background: transparent; }
 
 /* ======================================================
    CUSTOM ANIMATED HAMBURGER
@@ -210,6 +228,10 @@ body {
   position: relative;
   animation: brandTextEntry 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
 }
+
+/* Two-tone wordmark; the split is applied by the script below the navbar. */
+.brand-text .wm-a { color: var(--text); }
+.brand-text .wm-b { color: var(--accent); }
 
 @keyframes brandTextEntry {
   from { opacity: 0; transform: translateX(-8px); }
@@ -658,6 +680,80 @@ html.inverted #comp {
 .toast-item.toast-warning { border-left-color: #f59e0b; }
 .toast-item.toast-info    { border-left-color: #3b82f6; }
 .toast-icon { font-size: 1rem; flex-shrink: 0; }
+
+/* ======================================================
+   BELL PANEL ROWS
+====================================================== */
+.bell-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text); text-decoration: none;
+  opacity: 0.7;
+  transition: background 0.12s ease, opacity 0.12s ease;
+}
+.bell-item:hover { background: color-mix(in srgb, var(--accent) 8%, var(--bg-elevated)); color: var(--text); opacity: 1; }
+.bell-item.is-unread { opacity: 1; background: color-mix(in srgb, #e74c3c 6%, var(--bg-elevated)); }
+.bell-item-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; margin-top: 5px; }
+.bell-item.is-unread .bell-item-dot { background: #e74c3c; }
+.bell-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bell-item-msg { font-size: 0.82rem; font-weight: 600; line-height: 1.35; }
+.bell-item-meta { font-size: 0.7rem; color: var(--muted-text); }
+
+/* ======================================================
+   ALERT POPUPS (Discord-style, top right under the navbar)
+====================================================== */
+#alert-popups {
+  position: fixed;
+  top: 76px; right: 16px;
+  z-index: 99999;
+  display: flex; flex-direction: column; gap: 10px;
+  pointer-events: none;
+  width: min(360px, calc(100vw - 32px));
+}
+.alert-popup {
+  position: relative; overflow: hidden;
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 36px 14px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.28);
+  color: var(--text); text-decoration: none;
+  pointer-events: auto;
+  transform: translateX(calc(100% + 24px));
+  opacity: 0;
+  transition: transform 0.34s var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)), opacity 0.2s ease;
+}
+.alert-popup.show { transform: none; opacity: 1; }
+.alert-popup:hover { color: var(--text); border-color: color-mix(in srgb, #e74c3c 45%, var(--border)); }
+.alert-popup-icon {
+  width: 40px; height: 40px; flex-shrink: 0;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #e74c3c; color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #e74c3c 20%, transparent);
+}
+.alert-popup-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.alert-popup-title { font-size: 0.9rem; font-weight: 800; letter-spacing: -0.01em; }
+.alert-popup-time { font-size: 0.7rem; font-weight: 500; color: var(--muted-text); margin-left: 4px; }
+.alert-popup-msg { font-size: 0.82rem; color: var(--muted-text); line-height: 1.35; }
+.alert-popup-close {
+  position: absolute; top: 6px; right: 8px;
+  background: none; border: none; cursor: pointer;
+  color: var(--muted-text); font-size: 1.15rem; line-height: 1;
+  padding: 2px 6px; border-radius: 6px;
+}
+.alert-popup-close:hover { background: var(--border); color: var(--text); }
+/* Shrinking bar shows how long until the popup leaves; hovering pauses it. */
+.alert-popup-timer {
+  position: absolute; left: 0; bottom: 0; height: 3px; width: 100%;
+  background: #e74c3c; transform-origin: left;
+  animation: alertPopupTimer 7s linear forwards;
+}
+.alert-popup.paused .alert-popup-timer { animation-play-state: paused; }
+@keyframes alertPopupTimer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (max-width: 991px) { #alert-popups { top: 68px; right: 12px; } }
 
 /* ======================================================
    BUTTON RIPPLE
@@ -1125,7 +1221,7 @@ html.inverted #settings-menu-panel {
 
 .nav-link {
   position: relative;
-  transition: color 0.16s var(--nav-ease), transform 0.12s var(--nav-ease);
+  transition: color 0.18s var(--nav-ease), transform 0.12s var(--nav-ease);
   border-radius: 8px;
 }
 
@@ -1138,23 +1234,27 @@ html.inverted #settings-menu-panel {
    ---------------------------------------------------------------------- */
 .navbar-nav { position: relative; }
 
+@media (min-width: 992px) {
+  .navbar-nav.me-auto { gap: 0.35rem; }
+}
+
 .nav-pill {
   position: absolute;
   top: 0;
   left: 0;
   height: 0;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--accent) 16%, transparent);
   opacity: 0;
   pointer-events: none;
   z-index: 0;
-  /* Slight overshoot on the move, so it arrives with a little weight. */
   transition:
-    transform 0.34s cubic-bezier(0.34, 1.4, 0.5, 1),
-    width     0.34s cubic-bezier(0.34, 1.4, 0.5, 1),
-    height    0.24s var(--nav-ease),
-    opacity   0.18s ease;
+    transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width     0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    height    0.18s var(--nav-ease),
+    opacity   0.16s ease;
   will-change: transform, width;
 }
 
@@ -1175,9 +1275,6 @@ html.inverted #settings-menu-panel {
   from { transform: scaleX(0); opacity: 0; }
   to   { transform: scaleX(1); opacity: 1; }
 }
-
-/* Text lifts a touch as the pill arrives under it. */
-.nav-link:hover { transform: translateY(-1px); }
 
 /* A press should feel like a press. */
 .nav-link:active { transform: scale(0.96); }
@@ -1559,6 +1656,24 @@ html.inverted .compdd-panel {
 </style>
 
 <!-- ======================================================
+     THEME (must run before first paint, or a dark-mode reload
+     flashes the light theme until the body scripts catch up)
+====================================================== -->
+<script>
+(function () {
+  var dark = false;
+  try { dark = localStorage.getItem('inverted') === '1'; } catch (e) {}
+  if (dark) {
+    document.documentElement.classList.add('inverted');
+    // Bootstrap 5.3 components (tables, selects, dropdowns) read this one.
+    document.documentElement.setAttribute('data-bs-theme', 'dark');
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) { meta.setAttribute('content', '#121212'); }
+  }
+})();
+</script>
+
+<!-- ======================================================
      MOTION PREFERENCE (must run before first paint)
 ====================================================== -->
 <script>
@@ -1629,15 +1744,13 @@ html.inverted .compdd-panel {
   .navbar-collapse .navbar-nav.me-auto > .nav-item:has(.compdd) { grid-column: 1 / -1; }
   #comp { margin-top: 0; }
 
-  /* Alerts | Language | Settings side by side. The "jump to team" search is left
-     out of the phone menu: it sat on top of the event picker's list. */
+  /* Alerts | Language | Settings side by side. */
   .navbar-collapse .navbar-nav.ms-auto {
     grid-template-columns: repeat(3, 1fr);
     align-items: stretch;
     margin-top: 0.4rem;
   }
   .navbar-collapse .navbar-nav.ms-auto > .nav-item { display: contents; }
-  #team-search-wrap { display: none !important; }
 
   .navbar-collapse .nav-icon-btn {
     grid-row: 1;
@@ -1787,14 +1900,28 @@ html.inverted .navbar .dropdown-menu { box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5
 <body>
 <div id="page-loading-bar"></div>
 <div id="toast-container"></div>
+<div id="alert-popups" aria-live="polite"></div>
 <header>
 <nav class="navbar navbar-expand-lg">
 <div class="container-fluid">
 
 <a class="navbar-brand" href="/">
   <img src="{% static 'images/logo.png' %}" class="brand-logo" alt="{{ app_name }} logo">
-  <span class="brand-text">{{ app_name }}</span>
+  <span class="brand-text" id="brand-text">{{ app_name }}</span>
 </a>
+<script>
+(function () {
+  var el = document.getElementById('brand-text');
+  var t = el.textContent.trim();
+  var i = t.indexOf(' ');
+  if (i === -1) { i = t.slice(1).search(/[A-Z]/) + 1; }
+  if (i <= 0) return;
+  el.textContent = '';
+  var a = document.createElement('span'); a.className = 'wm-a'; a.textContent = t.slice(0, i);
+  var b = document.createElement('span'); b.className = 'wm-b'; b.textContent = t.slice(i);
+  el.appendChild(a); el.appendChild(b);
+})();
+</script>
 
 <button class="hamburger-btn"
         data-bs-toggle="collapse"
@@ -1833,14 +1960,6 @@ html.inverted .navbar .dropdown-menu { box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5
 </ul>
 
 <ul class="navbar-nav ms-auto align-items-center gap-1">
-
-<!-- Global team search -->
-<li class="nav-item" style="position:relative;" id="team-search-wrap">
-  <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted-text);" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-  <input id="global-team-search" type="search" placeholder="Jump to team…" autocomplete="off"
-    style="background:var(--bg-elevated);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:6px 10px 6px 28px;font-size:0.82rem;width:150px;outline:none;transition:border-color 0.2s,box-shadow 0.2s,width 0.2s;">
-  <div id="team-search-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:200px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,0.14);z-index:9999;overflow:hidden;"></div>
-</li>
 
 <!-- Bell Notification Button -->
 <li class="nav-item" style="position:relative;">
@@ -1996,19 +2115,6 @@ html.inverted .navbar .dropdown-menu { box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5
   </div>
 </li>
 
-<li>
-  <div class="settings-row">
-    <span class="settings-row-icon" aria-hidden="true">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
-    </span>
-    <span class="settings-row-label">Match Type</span>
-    <select id="default-quantifier" class="settings-select">
-      <option value="Quals">Qualifications</option>
-      <option value="Prac">Practice</option>
-      <option value="Playoff">Playoff</option>
-    </select>
-  </div>
-</li>
 
 {% if request.session.name %}
 <hr class="settings-panel-divider">
@@ -2305,6 +2411,9 @@ window.t = function(key) {
 
   function setTheme(on){
     document.documentElement.classList.toggle("inverted", on);
+    document.documentElement.setAttribute("data-bs-theme", on ? "dark" : "light");
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", on ? "#121212" : "#E63946");
     localStorage.setItem("inverted", on ? "1" : "0");
     updateUI(on);
   }
@@ -2508,125 +2617,154 @@ window.t = function(key) {
 </script>
 
 <!-- ======================================================
-     BELL NOTIFICATION SYSTEM
+     BELL NOTIFICATIONS + BROKEN ROBOT ALERTS
+     One poller for the whole site. Alerts are keyed by team + match, so two
+     scouts reporting the same robot make one notification, and "Clear all"
+     is remembered per event so a reload does not bring them back.
 ====================================================== -->
 <script>
 (function () {
     'use strict';
 
-    var alerts = [];  // {id, message, ts, read}
-    var panelOpen = false;
-
-    var btn    = document.getElementById('bell-btn');
-    var panel  = document.getElementById('bell-panel');
-    var badge  = document.getElementById('bell-badge');
-    var list   = document.getElementById('bell-list');
-    var empty  = document.getElementById('bell-empty');
+    var btn      = document.getElementById('bell-btn');
+    var panel    = document.getElementById('bell-panel');
+    var badge    = document.getElementById('bell-badge');
+    var list     = document.getElementById('bell-list');
+    var empty    = document.getElementById('bell-empty');
     var clearBtn = document.getElementById('bell-clear');
+    var popups   = document.getElementById('alert-popups');
+    if (!btn) return;
 
-    if (!btn) return;  // bell not in page (shouldn't happen)
+    var comp = new URLSearchParams(window.location.search).get('comp');
+    try { comp = comp || localStorage.getItem('comp') || ''; } catch (e) { comp = comp || ''; }
 
-    /* ---- Public API so pages can push alerts ---- */
-    window.pushBellAlert = function (alert) {
-        // Deduplicate by id
-        if (alerts.some(function (a) { return a.id === alert.id; })) return;
-        alerts.unshift(alert);
-        if (alerts.length > 50) alerts.pop();
-        renderList();
-        updateBadge();
-        if (!panelOpen) {
-            // Flash bell icon
-            var icon = document.getElementById('bell-icon');
-            if (icon) {
-                icon.style.stroke = '#e74c3c';
-                setTimeout(function () { icon.style.stroke = ''; }, 1200);
-            }
-        }
-    };
-
-    function unreadCount() {
-        return alerts.filter(function (a) { return !a.read; }).length;
+    /* ---- Persistent per-event state ----
+       clearedThrough: alerts at or below this id were cleared, never refetched
+       seenThrough:    alerts at or below this id have been seen in the panel
+       poppedThrough:  alerts at or below this id already showed a popup */
+    var STATE_KEY = 'bell_state_v2:' + comp;
+    var state = { clearedThrough: 0, seenThrough: 0, poppedThrough: 0 };
+    try { Object.assign(state, JSON.parse(localStorage.getItem(STATE_KEY)) || {}); } catch (e) {}
+    function saveState() {
+        try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch (e) {}
     }
 
+    var alerts = [];   // {key, id, team, scouts[], message, ts}
+    var panelOpen = false;
+    var latestId = state.clearedThrough;
+    var firstPoll = true;
+
+    function esc(v) {
+        return String(v == null ? '' : v)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function isUnread(a) { return a.id > state.seenThrough; }
+
     function updateBadge() {
-        var n = unreadCount();
-        if (n > 0) {
-            badge.textContent = n > 9 ? '9+' : n;
-            badge.style.display = 'block';
-        } else {
-            badge.style.display = 'none';
-        }
+        var n = alerts.filter(isUnread).length;
+        badge.textContent = n > 9 ? '9+' : n;
+        badge.style.display = n > 0 ? 'block' : 'none';
     }
 
     function formatTime(ts) {
-        var d = new Date(ts);
-        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function teamHref(a) {
+        return '/teams/' + encodeURIComponent(a.team) + '/' + (comp ? '?comp=' + encodeURIComponent(comp) : '');
     }
 
     function renderList() {
         list.innerHTML = '';
-        if (alerts.length === 0) {
-            empty.style.display = 'block';
-            return;
-        }
-        empty.style.display = 'none';
+        empty.style.display = alerts.length ? 'none' : 'block';
         alerts.forEach(function (a) {
-            var item = document.createElement('div');
-            item.setAttribute('tabindex', '0');
-            item.setAttribute('role', 'button');
-            item.style.cssText = [
-                'display:flex', 'align-items:flex-start', 'gap:10px',
-                'padding:10px 16px', 'cursor:pointer',
-                'border-bottom:1px solid var(--border)',
-                'transition:background 0.12s ease',
-                a.read ? 'opacity:0.65' : 'background:color-mix(in srgb,#e74c3c 6%,var(--bg-elevated))',
-            ].join(';');
-
-            var dot = document.createElement('div');
-            dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:' +
-                (a.read ? 'var(--border)' : '#e74c3c') + ';flex-shrink:0;margin-top:5px;';
-
-            var content = document.createElement('div');
-            content.style.cssText = 'flex:1;min-width:0;';
-
-            var msg = document.createElement('div');
-            msg.style.cssText = 'font-size:0.82rem;font-weight:600;color:var(--text);line-height:1.35;';
-            msg.textContent = a.message;
-
-            var time = document.createElement('div');
-            time.style.cssText = 'font-size:0.7rem;color:var(--muted-text);margin-top:2px;';
-            time.textContent = formatTime(a.ts);
-
-            content.appendChild(msg);
-            content.appendChild(time);
-            item.appendChild(dot);
-            item.appendChild(content);
-
-            item.addEventListener('mouseenter', function () {
-                item.style.background = 'color-mix(in srgb,var(--accent) 8%,var(--bg-elevated))';
-            });
-            item.addEventListener('mouseleave', function () {
-                item.style.background = a.read
-                    ? ''
-                    : 'color-mix(in srgb,#e74c3c 6%,var(--bg-elevated))';
-            });
-            item.addEventListener('click', function () {
-                a.read = true;
-                renderList();
-                updateBadge();
-            });
-            item.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    a.read = true;
-                    renderList();
-                    updateBadge();
-                }
-            });
-
+            var item = document.createElement('a');
+            item.className = 'bell-item' + (isUnread(a) ? ' is-unread' : '');
+            item.href = a.team ? teamHref(a) : '#';
+            item.innerHTML =
+                '<span class="bell-item-dot" aria-hidden="true"></span>' +
+                '<span class="bell-item-body">' +
+                    '<span class="bell-item-msg">' + esc(a.message) + '</span>' +
+                    '<span class="bell-item-meta">' + esc(formatTime(a.ts)) +
+                        (a.scouts && a.scouts.length ? ' · reported by ' + esc(a.scouts.join(', ')) : '') +
+                    '</span>' +
+                '</span>';
             list.appendChild(item);
         });
     }
+
+    /* ---- Discord-style popup ---- */
+    function showPopup(a) {
+        if (!popups) return;
+        var card = document.createElement('a');
+        card.className = 'alert-popup';
+        card.href = a.team ? teamHref(a) : '#';
+        card.setAttribute('role', 'status');
+        card.innerHTML =
+            '<span class="alert-popup-icon" aria-hidden="true">' +
+                '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+            '</span>' +
+            '<span class="alert-popup-body">' +
+                '<span class="alert-popup-title">Robot broken <span class="alert-popup-time">now</span></span>' +
+                '<span class="alert-popup-msg">' + esc(a.message) + '</span>' +
+            '</span>' +
+            '<button type="button" class="alert-popup-close" aria-label="Dismiss">&times;</button>' +
+            '<span class="alert-popup-timer" aria-hidden="true"></span>';
+
+        var gone = false;
+        function dismiss() {
+            if (gone) return;
+            gone = true;
+            card.classList.remove('show');
+            setTimeout(function () { card.remove(); }, 260);
+        }
+        card.querySelector('.alert-popup-close').addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dismiss();
+        });
+
+        // Hovering pauses the auto-dismiss so it can be read.
+        var remaining = 7000, startedAt = 0, timer = null;
+        function run() { startedAt = Date.now(); timer = setTimeout(dismiss, remaining); card.classList.remove('paused'); }
+        function pause() { clearTimeout(timer); remaining -= Date.now() - startedAt; card.classList.add('paused'); }
+        card.addEventListener('mouseenter', pause);
+        card.addEventListener('mouseleave', run);
+
+        popups.appendChild(card);
+        while (popups.children.length > 3) { popups.firstElementChild.remove(); }
+        requestAnimationFrame(function () { requestAnimationFrame(function () { card.classList.add('show'); }); });
+        run();
+
+        try { if (navigator.vibrate) navigator.vibrate([60, 40, 60]); } catch (e) {}
+    }
+
+    /* ---- Public API so pages can push their own alerts ----
+       Same key = same notification: a second report only adds its scout. */
+    window.pushBellAlert = function (a) {
+        a.key = a.key || String(a.id);
+        a.scouts = a.scouts || [];
+        var existing = alerts.find(function (x) { return x.key === a.key; });
+        if (existing) {
+            a.scouts.forEach(function (s) {
+                if (s && existing.scouts.indexOf(s) === -1) existing.scouts.push(s);
+            });
+            renderList();
+            return;
+        }
+        alerts.unshift(a);
+        if (alerts.length > 50) alerts.pop();
+        renderList();
+        updateBadge();
+
+        if (!panelOpen && a.id > state.poppedThrough) {
+            state.poppedThrough = Math.max(state.poppedThrough, a.id);
+            saveState();
+            showPopup(a);
+        }
+    };
 
     function closeOtherDropdowns() {
         document.querySelectorAll('[data-bs-toggle="dropdown"].show').forEach(function (t) {
@@ -2638,19 +2776,24 @@ window.t = function(key) {
     // Opening a Bootstrap dropdown (Strategy, language, settings) closes the alerts.
     document.addEventListener('show.bs.dropdown', function () { if (panelOpen) closePanel(); });
 
+    function markAllSeen() {
+        alerts.forEach(function (a) { state.seenThrough = Math.max(state.seenThrough, a.id); });
+        saveState();
+        updateBadge();
+    }
+
     function openPanel() {
         closeOtherDropdowns();
         panelOpen = true;
         panel.style.display = 'flex';
-        // Mark all as read when panel opens
-        alerts.forEach(function (a) { a.read = true; });
-        updateBadge();
-        renderList();
+        renderList();       // unread rows stay highlighted while the panel is open
+        markAllSeen();
     }
 
     function closePanel() {
         panelOpen = false;
         panel.style.display = 'none';
+        renderList();
     }
 
     btn.addEventListener('click', function (e) {
@@ -2660,29 +2803,75 @@ window.t = function(key) {
 
     clearBtn && clearBtn.addEventListener('click', function (e) {
         e.stopPropagation();
+        state.clearedThrough = Math.max(state.clearedThrough, latestId);
+        state.seenThrough = Math.max(state.seenThrough, latestId);
+        state.poppedThrough = Math.max(state.poppedThrough, latestId);
+        saveState();
         alerts = [];
         renderList();
         updateBadge();
     });
 
     document.addEventListener('click', function (e) {
-        if (panelOpen && !panel.contains(e.target) && e.target !== btn) {
-            closePanel();
-        }
+        if (panelOpen && !panel.contains(e.target) && !btn.contains(e.target)) closePanel();
     });
 
-    // Close on Escape
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && panelOpen) closePanel();
     });
 
     renderList();
     updateBadge();
+
+    /* ---- Poll the server for broken-robot reports ---- */
+    if (!comp || comp === 'testing') return;
+
+    function poll() {
+        fetch('/api/alerts/?comp=' + encodeURIComponent(comp) + '&since_id=' + latestId, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+            if (!data || !Array.isArray(data.alerts)) return;
+            // The backlog fetched on page load fills the list quietly; only
+            // reports that arrive while the page is open get a popup.
+            if (firstPoll) {
+                firstPoll = false;
+                data.alerts.forEach(function (a) {
+                    state.poppedThrough = Math.max(state.poppedThrough, a.id);
+                });
+            }
+            latestId = Math.max(latestId, data.latest_id || 0);
+            data.alerts.forEach(function (a) {
+                window.pushBellAlert({
+                    id: a.id,
+                    key: 'broken:' + a.quantifier + ':' + a.match_number + ':' + a.team_number,
+                    team: a.team_number,
+                    message: 'Team ' + a.team_number + ' reported broken in ' +
+                             a.quantifier + ' match ' + a.match_number,
+                    scouts: a.scout_name ? [a.scout_name] : [],
+                    ts: Date.now(),
+                });
+            });
+            // A full page means more may be waiting.
+            if (data.alerts.length >= 20) setTimeout(poll, 500);
+        })
+        .catch(function () {});
+    }
+
+    setTimeout(poll, 1500);
+    setInterval(function () {
+        if (document.visibilityState === 'visible') poll();
+    }, 15000);
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') poll();
+    });
 })();
 </script>
 
 <!-- ======================================================
-     ACCENT COLOR · MOTION · DEFAULT QUANTIFIER SETTINGS
+     ACCENT COLOR · MOTION SETTINGS
 ====================================================== -->
 <script>
 (function () {
@@ -2767,37 +2956,6 @@ window.t = function(key) {
      the OS preference keeps being followed until then. */
   syncMotionLabel();
 
-  /* ---- Default Quantifier ---- */
-  var qSelect = document.getElementById('default-quantifier');
-  var storedQ = localStorage.getItem('defaultQuantifier') || 'Quals';
-
-  if (qSelect) {
-    qSelect.value = storedQ;
-    qSelect.addEventListener('change', function () {
-      localStorage.setItem('defaultQuantifier', qSelect.value);
-      // Update any visible quantifier selects on the page
-      document.querySelectorAll('select#quantifier').forEach(function (el) {
-        if (!el.value || el.getAttribute('data-user-set') !== '1') {
-          el.value = qSelect.value;
-        }
-      });
-    });
-  }
-
-  // Apply default quantifier to page quantifier selects that haven't been
-  // explicitly set by the user this session
-  document.addEventListener('DOMContentLoaded', function () {
-    var q = localStorage.getItem('defaultQuantifier') || 'Quals';
-    document.querySelectorAll('select#quantifier').forEach(function (el) {
-      if (!el.getAttribute('data-user-set')) {
-        el.value = q;
-        el.addEventListener('change', function () {
-          el.setAttribute('data-user-set', '1');
-        });
-      }
-    });
-  });
-
 })();
 </script>
 
@@ -2826,173 +2984,6 @@ html.no-motion *::after {
 }
 </style>
 
-<!-- ======================================================
-     GLOBAL TEAM SEARCH
-====================================================== -->
-<script>
-(function () {
-  var input = document.getElementById('global-team-search');
-  var dropdown = document.getElementById('team-search-dropdown');
-  if (!input) return;
-
-  var teams = [];  // populated from get_events + localStorage comp
-
-  // Focus styles
-  input.addEventListener('focus', function () {
-    input.style.width = '200px';
-    input.style.borderColor = 'var(--accent)';
-    input.style.boxShadow = '0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)';
-  });
-  input.addEventListener('blur', function () {
-    setTimeout(function () {
-      if (dropdown.contains(document.activeElement)) return;
-      input.style.width = '150px';
-      input.style.borderColor = 'var(--border)';
-      input.style.boxShadow = 'none';
-      dropdown.style.display = 'none';
-    }, 180);
-  });
-
-  function getComp() {
-    return localStorage.getItem('comp') || '';
-  }
-
-  function navigate(num) {
-    var comp = getComp();
-    window.location.assign('/teams/' + num + '/' + (comp ? '?comp=' + comp : ''));
-  }
-
-  function renderDropdown(filtered) {
-    dropdown.innerHTML = '';
-    if (!filtered.length) {
-      dropdown.style.display = 'none';
-      return;
-    }
-    filtered.slice(0, 8).forEach(function (t) {
-      var item = document.createElement('div');
-      item.setAttribute('tabindex', '0');
-      item.setAttribute('role', 'option');
-      item.style.cssText = 'padding:9px 14px;font-size:0.82rem;font-weight:600;color:var(--text);cursor:pointer;transition:background 0.12s;';
-      item.textContent = t.number + (t.name ? ' — ' + t.name : '');
-      item.addEventListener('mouseenter', function () { item.style.background = 'color-mix(in srgb,var(--accent) 8%,var(--bg-elevated))'; });
-      item.addEventListener('mouseleave', function () { item.style.background = ''; });
-      item.addEventListener('mousedown', function (e) { e.preventDefault(); navigate(t.number); });
-      item.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          navigate(t.number);
-        } else if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          var next = item.nextElementSibling;
-          if (next) next.focus();
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          var prev = item.previousElementSibling;
-          if (prev) prev.focus(); else input.focus();
-        } else if (e.key === 'Escape') {
-          dropdown.style.display = 'none';
-          input.focus();
-        }
-      });
-      dropdown.appendChild(item);
-    });
-    dropdown.style.display = 'block';
-  }
-
-  // Fetch team list for current comp
-  function loadTeams() {
-    var comp = getComp();
-    if (!comp || comp === 'testing') return;
-    fetch('/api/team_matches_list/?comp=' + comp, { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (data) { if (data && data.teams) teams = data.teams; })
-      .catch(function () {});
-  }
-
-  input.addEventListener('input', function () {
-    var q = input.value.trim().toLowerCase();
-    if (!q) { dropdown.style.display = 'none'; return; }
-
-    // If it's a pure number, show direct navigation option first
-    var filtered = [];
-    if (/^\d+$/.test(q)) {
-      filtered = teams.filter(function (t) { return String(t.number).startsWith(q); });
-      if (!filtered.length) {
-        // Show a direct "Go to team <q>" entry
-        filtered = [{ number: q, name: '' }];
-      }
-    } else {
-      filtered = teams.filter(function (t) {
-        return (t.name || '').toLowerCase().includes(q);
-      });
-    }
-    renderDropdown(filtered);
-  });
-
-  input.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') {
-      var q = input.value.trim();
-      if (/^\d+$/.test(q)) {
-        navigate(q);
-      }
-    }
-    if (e.key === 'Escape') { dropdown.style.display = 'none'; input.blur(); }
-    if (e.key === 'ArrowDown' && dropdown.style.display === 'block') {
-      var first = dropdown.firstElementChild;
-      if (first) { e.preventDefault(); first.focus(); }
-    }
-  });
-
-  // Load teams shortly after page load, and when comp changes
-  setTimeout(loadTeams, 800);
-  document.getElementById('comp') && document.getElementById('comp').addEventListener('change', function () {
-    setTimeout(loadTeams, 400);
-  });
-})();
-</script>
-
-<!-- ======================================================
-     BROKEN ROBOT ALERT POLLER
-====================================================== -->
-<script>
-(function () {
-  var comp = localStorage.getItem('comp') || '';
-  if (!comp || comp === 'testing') return;
-
-  var latestId = 0;
-
-  function poll() {
-    fetch('/api/alerts/?comp=' + encodeURIComponent(comp) + '&since_id=' + latestId, {
-      credentials: 'same-origin'
-    })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (data) {
-      if (!data || !data.alerts) return;
-      latestId = data.latest_id || latestId;
-      data.alerts.forEach(function (a) {
-        window.pushBellAlert && window.pushBellAlert({
-          id: 'broken-' + a.id,
-          message: '⚠️ Team ' + a.team_number + ' reported broken in Match ' + a.match_number + ' (' + a.quantifier + ')',
-          ts: Date.now(),
-          read: false,
-        });
-      });
-    })
-    .catch(function () {});
-  }
-
-  // Initial poll after a short delay, then every 45 seconds while the tab is visible
-  setTimeout(poll, 3000);
-  setInterval(function () {
-    if (document.visibilityState === 'visible') poll();
-  }, 45000);
-
-  // Pause while backgrounded; poll immediately on return to catch up
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') poll();
-  });
-})();
-</script>
 
 {% block Scripts %}{% endblock %}
 

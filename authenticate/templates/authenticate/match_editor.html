@@ -167,6 +167,34 @@
             text-decoration: underline;
         }
     </style>
+    <script>
+    /* Same preference key as the main site, applied before first paint. */
+    (function () {
+        try {
+            if (localStorage.getItem('inverted') === '1') document.documentElement.classList.add('inverted');
+        } catch (e) {}
+    })();
+    </script>
+    <style>
+        /* Dark mode, matching the main site's palette. */
+        html.inverted { color-scheme: dark; background: #121212; scrollbar-color: #3a3a3a transparent; }
+        html.inverted body { background: #121212; color: #f5f5f5; }
+        html.inverted h1, html.inverted h2, html.inverted h3 { color: #f5f5f5; }
+        html.inverted .container { background: #1e1e1e; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+        html.inverted label { color: #a0a0a0; }
+        html.inverted select, html.inverted input[type="number"], html.inverted textarea {
+            background: #121212; color: #f5f5f5; border-color: #333333;
+        }
+        html.inverted select:disabled { background: #262626; color: #777; }
+        html.inverted .alert-info    { background: color-mix(in srgb, #e74c3c 12%, transparent); color: #f5f5f5; }
+        html.inverted .alert-warning { background: color-mix(in srgb, #f39c12 14%, transparent); color: #fcd34d; }
+        html.inverted .alert-success { background: color-mix(in srgb, #27ae60 14%, transparent); color: #4ade80; }
+        html.inverted .alert-error   { background: color-mix(in srgb, #e74c3c 14%, transparent); color: #fca5a5; }
+        html.inverted .back-link { color: #FF4D4D; }
+        html.inverted ::-webkit-scrollbar { width: 10px; height: 10px; }
+        html.inverted ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+        html.inverted ::-webkit-scrollbar-track, html.inverted ::-webkit-scrollbar-corner { background: transparent; }
+    </style>
 </head>
 <body>
     <h1>Match Data Editor</h1>

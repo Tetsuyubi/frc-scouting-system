@@ -1,4 +1,5 @@
 import functools
+import ipaddress
 
 from django.conf import settings
 from django.http import HttpResponseRedirect, JsonResponse
@@ -21,8 +22,8 @@ def login_required(function):
 def role_required(*allowed_roles):
     """
     Decorator that checks the user has one of the allowed roles.
-    - 'admin' session role always passes (full access).
-    - 'teacher' session role passes for all non-admin-panel routes.
+    - The current database admin role always passes (full access).
+    - The current teacher role passes for all non-admin-panel routes.
     - On failure renders a 403 page.
     """
     def decorator(function):
@@ -34,10 +35,18 @@ def role_required(*allowed_roles):
                     return JsonResponse({'error': 'Not authenticated'}, status=401)
                 from django.http import HttpResponseRedirect
                 return HttpResponseRedirect('/auth/')
-            roles_str = request.session.get('role', 'student')
-            user_roles = set(roles_str.split(',')) if roles_str else {'student'}
-            # Users in the AuthorizedUser table (is_admin) always have full access
-            if request.session.get('is_admin') or bool(user_roles & set(allowed_roles)):
+            from authenticate.models import AuthorizedUser
+            authorized_user = AuthorizedUser.objects.filter(
+                email__iexact=request.session['email']
+            ).first()
+            if authorized_user:
+                user_roles = set(authorized_user.get_roles_list())
+                is_admin = authorized_user.is_admin
+            else:
+                user_roles = {'student'}
+                is_admin = False
+            roles_str = ','.join(sorted(user_roles)) or 'student'
+            if is_admin or bool(user_roles & set(allowed_roles)):
                 return function(request, *args, **kw)
             if 'teacher' in user_roles and 'admin_only' not in allowed_roles:
                 return function(request, *args, **kw)
@@ -83,19 +92,55 @@ def rate_limit(max_calls, period_seconds):
     max_calls: maximum number of allowed calls in the window
     period_seconds: window length in seconds
     """
+    def is_trusted_proxy(address, trusted_proxies):
+        try:
+            parsed_address = ipaddress.ip_address(address)
+        except ValueError:
+            return False
+        for trusted_proxy in trusted_proxies:
+            try:
+                if '/' in trusted_proxy:
+                    if parsed_address in ipaddress.ip_network(trusted_proxy, strict=False):
+                        return True
+                elif parsed_address == ipaddress.ip_address(trusted_proxy):
+                    return True
+            except ValueError:
+                continue
+        return False
+
+    def client_ip(request):
+        remote_addr = request.META.get('REMOTE_ADDR', 'unknown')
+        trusted_proxies = getattr(settings, 'TRUSTED_PROXIES', [])
+        if not is_trusted_proxy(remote_addr, trusted_proxies):
+            return remote_addr
+
+        forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
+        addresses = [address.strip() for address in forwarded_for.split(',') if address.strip()]
+        addresses.append(remote_addr)
+        for address in reversed(addresses):
+            if not is_trusted_proxy(address, trusted_proxies):
+                try:
+                    return str(ipaddress.ip_address(address))
+                except ValueError:
+                    continue
+        return remote_addr
+
     def decorator(function):
         @functools.wraps(function)
         def wrapper(request, *args, **kw):
-            remote_addr = request.META.get('REMOTE_ADDR', 'unknown')
-            trusted_proxies = getattr(settings, 'TRUSTED_PROXIES', [])
-            if remote_addr in trusted_proxies:
-                forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
-                ip = forwarded_for.split(',')[0].strip() or remote_addr
-            else:
-                ip = remote_addr
+            ip = client_ip(request)
             cache_key = f"rl:{function.__name__}:{ip}"
-            count = cache.get(cache_key, 0)
-            if count >= max_calls:
+            if cache.add(cache_key, 1, timeout=period_seconds):
+                count = 1
+            else:
+                try:
+                    count = cache.incr(cache_key)
+                except ValueError:
+                    if cache.add(cache_key, 1, timeout=period_seconds):
+                        count = 1
+                    else:
+                        count = cache.incr(cache_key)
+            if count > max_calls:
                 return JsonResponse(
                     {'error': 'Too many requests. Please try again later.'},
                     status=429

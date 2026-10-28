@@ -29,6 +29,7 @@ urlpatterns = [
     # path('admin/', admin.site.urls),  # Disabled Django admin
     path('', team_views.home, name='home'),
     path('scanner/', scanner_views.scanner, name='scanner'),
+    path('scanner/sw.js', scanner_views.service_worker, name='scanner_sw'),
     path('teams/', team_views.display_teams, name='teams'),
     path('teams/compare/', team_views.compare_teams, name='compare_teams'),
     path('teams/<int:team_number>/', team_views.team_page, name='team_page'),

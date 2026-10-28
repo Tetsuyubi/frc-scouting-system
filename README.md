@@ -92,7 +92,7 @@ npm run build
 # Run migrations
 python manage.py migrate
 
-# Create first admin user (via Django shell)
+# Create the first administrator (via Django shell)
 python manage.py shell
 ```
 
@@ -100,8 +100,20 @@ In the shell:
 - Any email domain works; the authorised-user list is not tied to a particular one.
 ```python
 from authenticate.models import AuthorizedUser
-AuthorizedUser.objects.create(email='you@example.com')
+AuthorizedUser.objects.create(email='you@example.com', roles='admin')
 exit()
+```
+
+Authorized users with other roles are not administrators. To promote an existing
+account, set its roles to include `admin` from the Django shell or promote it
+from the admin panel as an existing administrator. When upgrading an existing
+deployment, promote at least one administrator before switching to this version.
+For example, run this in the Django shell before deploying an upgrade:
+
+```python
+user = AuthorizedUser.objects.get(email='existing-admin@example.com')
+user.roles = 'admin'
+user.save(update_fields=['roles'])
 ```
 
 ### 6. Collect Static Files

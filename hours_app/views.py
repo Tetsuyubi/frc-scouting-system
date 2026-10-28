@@ -16,6 +16,7 @@ from .models import (
     CheckInOut, SeasonRank, UserProfile, Badge,
     SUBTEAM_CHOICES, SUBTEAM_COLORS, BADGE_CHOICES, BADGE_COLORS, BADGE_META, badge_roster,
 )
+from authenticate.models import AuthorizedUser
 from helpers import login_required
 
 logger = logging.getLogger(__name__)
@@ -99,7 +100,9 @@ def _may_moderate(request):
     the two privilege systems this project already has. A mentor should not
     need an admin-panel seat just to clear an inappropriate photo.
     """
-    if request.session.get('is_admin'):
+    email = request.session.get('email')
+    authorized_user = AuthorizedUser.objects.filter(email__iexact=email).first() if email else None
+    if authorized_user and authorized_user.is_admin:
         return True
     profile = UserProfile.objects.filter(user=request.user).first()
     return bool(profile and profile.is_privileged())

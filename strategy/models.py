@@ -3,7 +3,7 @@ from django.db import models
 # Create your models here.
 
 class PickList_Data(models.Model):
-    event = models.CharField(max_length=16, default="testing")
+    event = models.CharField(max_length=20, default="testing")
     no_pick = models.JSONField(default=list)
     first_pick = models.JSONField(default=list)
     second_pick = models.JSONField(default=list)
@@ -23,3 +23,8 @@ class PickList_Data(models.Model):
     # picklist_submit validates unchanged.
     starred = models.JSONField(default=list)   # floated to the top of its column
     struck = models.JSONField(default=list)    # drafted by someone else; kept visible
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['event'], name='unique_picklist_event'),
+        ]

@@ -469,16 +469,37 @@ body.is-dragging .lists:not(.drag-over) { opacity: 0.85; }
     text-decoration-color: var(--accent);
 }
 
+/* Quick "move to No Pick" box. Drawn by hand instead of the native control,
+   which stayed a white square in dark mode. */
 .picklist_teams input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
     margin: 0;
+    margin-top: 2px;
     flex-shrink: 0;
-    cursor: pointer;
-    accent-color: var(--accent);
+    align-self: flex-start;
     width: 15px;
     height: 15px;
-    align-self: flex-start;
-    margin-top: 2px;
+    border: 1.5px solid color-mix(in srgb, var(--muted-text) 55%, var(--border));
+    border-radius: 4px;
+    background: var(--bg);
+    cursor: pointer;
+    display: inline-grid;
+    place-content: center;
+    transition: border-color 0.15s, background 0.15s;
 }
+.picklist_teams input[type="checkbox"]::before {
+    content: '';
+    width: 7px; height: 7px;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+    background: #fff;
+    transform: scale(0);
+    transition: transform 0.12s ease;
+}
+.picklist_teams input[type="checkbox"]:hover { border-color: var(--accent); }
+.picklist_teams input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+.picklist_teams input[type="checkbox"]:checked::before { transform: scale(1); }
+.picklist_teams input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* =========================
    Save Button
@@ -563,37 +584,101 @@ body.compare-mode .picklist_teams.cmp-picked {
 
 .cmp-backdrop {
     position: fixed; inset: 0; z-index: 9100;
-    background: rgba(0,0,0,0.45);
+    background: rgba(0,0,0,0.55);
     display: flex; align-items: center; justify-content: center;
-    padding: 20px; overflow-y: auto;
+    padding: 16px;
 }
 .cmp-backdrop[hidden] { display: none; }
+/* Uses most of the screen: a comparison is only useful if the columns are
+   wide enough to read side by side. */
 .cmp-modal {
     background: var(--bg-elevated); border: 1px solid var(--border);
-    border-radius: 16px; width: min(980px, 100%);
-    max-height: calc(100vh - 40px); margin: auto;
+    border-radius: 18px; width: min(1400px, 100%);
+    height: min(900px, calc(100dvh - 32px));
     display: flex; flex-direction: column; overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.35);
+    animation: modalIn 0.22s cubic-bezier(0.22,1,0.36,1) both;
 }
 .cmp-head {
     display: flex; align-items: center; gap: 12px;
-    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    padding: 14px 22px; border-bottom: 1px solid var(--border);
 }
-.cmp-title { font-size: 1.05rem; font-weight: 800; flex: 1; }
-.cmp-close { background: none; border: none; cursor: pointer; color: var(--muted-text); font-size: 1.1rem; }
-.cmp-body { padding: 16px 20px; overflow: auto; }
-.cmp-loading { text-align: center; padding: 24px; color: var(--muted-text); font-size: 0.85rem; }
-table.cmp-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-table.cmp-table th, table.cmp-table td {
-    padding: 0.5rem 0.65rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top;
+.cmp-title { font-size: 1.1rem; font-weight: 800; flex: 1; letter-spacing: -0.02em; }
+.cmp-legend { font-size: 0.74rem; color: var(--muted-text); display: inline-flex; align-items: center; gap: 6px; }
+.cmp-legend i { width: 10px; height: 10px; border-radius: 3px; background: color-mix(in srgb, #22c55e 30%, transparent); display: inline-block; }
+.cmp-close { background: none; border: none; cursor: pointer; color: var(--muted-text); font-size: 1.2rem; padding: 4px 8px; border-radius: 8px; }
+.cmp-close:hover { background: var(--border); color: var(--text); }
+.cmp-body { padding: 0 22px 22px; overflow: auto; flex: 1; }
+.cmp-loading { text-align: center; padding: 40px; color: var(--muted-text); font-size: 0.9rem; }
+
+/* One grid for the team header and every section, so the columns line up:
+   a fixed label column, then equal shares for each team. */
+.cmp-grid { display: grid; grid-template-columns: minmax(150px, 220px) repeat(var(--cols), minmax(150px, 1fr)); }
+.cmp-teams {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--bg-elevated);
+    padding: 16px 0 12px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
 }
-table.cmp-table th.cmp-metric { width: 160px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; white-space: nowrap; }
-table.cmp-table thead th { font-size: 0.95rem; font-weight: 800; }
-.cmp-team-head { display: flex; align-items: center; gap: 8px; }
-.cmp-team-head img { width: 28px; height: 28px; border-radius: 6px; object-fit: contain; }
-.cmp-nick { display: block; font-size: 0.72rem; font-weight: 500; opacity: 0.7; }
-.cmp-best { background: color-mix(in srgb, #2e7d32 16%, transparent); font-weight: 700; border-radius: 5px; }
+.cmp-team-card {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; border-radius: 14px;
+    background: var(--bg); border: 1px solid var(--border);
+    min-width: 0;
+}
+.cmp-team-card img, .cmp-team-card .cmp-logo-ph {
+    width: 44px; height: 44px; border-radius: 10px; object-fit: contain; flex-shrink: 0;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+}
+.cmp-team-num { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1; color: var(--text); }
+.cmp-team-nick { font-size: 0.78rem; color: var(--muted-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+.cmp-team-text { min-width: 0; flex: 1; }
+.cmp-team-link { font-size: 0.72rem; font-weight: 700; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.cmp-team-link:hover { text-decoration: underline; color: var(--accent); }
+
+.cmp-section { margin-top: 20px; }
+.cmp-section > summary {
+    list-style: none; cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted-text); padding: 6px 0;
+}
+.cmp-section > summary::-webkit-details-marker { display: none; }
+.cmp-section > summary::before { content: '\25B8'; transition: transform 0.15s; display: inline-block; }
+.cmp-section[open] > summary::before { transform: rotate(90deg); }
+.cmp-section > summary .cmp-count { font-weight: 600; letter-spacing: 0; text-transform: none; opacity: 0.8; }
+
+.cmp-rows { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.cmp-row { border-top: 1px solid var(--border); }
+.cmp-row:first-child { border-top: none; }
+.cmp-row:nth-child(even) { background: color-mix(in srgb, var(--bg) 55%, var(--bg-elevated)); }
+.cmp-label {
+    padding: 11px 14px; font-size: 0.84rem; font-weight: 600; color: var(--muted-text);
+    text-transform: capitalize; display: flex; align-items: center;
+}
+.cmp-cell {
+    padding: 11px 14px; font-size: 0.95rem; font-weight: 600; color: var(--text);
+    border-left: 1px solid var(--border);
+    font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+    display: flex; flex-direction: column; justify-content: center; gap: 6px;
+}
+.cmp-cell.cmp-text { font-size: 0.86rem; font-weight: 500; }
+.cmp-cell.cmp-best { background: color-mix(in srgb, #22c55e 14%, transparent); }
+.cmp-cell.cmp-best .cmp-val::after { content: ' \2605'; color: #16a34a; font-size: 0.8em; }
+html.inverted .cmp-cell.cmp-best .cmp-val::after { color: #4ade80; }
+.cmp-bar { height: 5px; border-radius: 999px; background: color-mix(in srgb, var(--border) 70%, transparent); overflow: hidden; }
+.cmp-bar > span { display: block; height: 100%; border-radius: inherit; background: color-mix(in srgb, var(--accent) 70%, transparent); }
+.cmp-cell.cmp-best .cmp-bar > span { background: #22c55e; }
 .cmp-na { opacity: 0.45; }
+
+@media (max-width: 700px) {
+    .cmp-backdrop { padding: 0; }
+    .cmp-modal { height: 100dvh; border-radius: 0; }
+    .cmp-body { padding: 0 12px 16px; }
+    .cmp-grid { grid-template-columns: 110px repeat(var(--cols), minmax(130px, 1fr)); }
+    .cmp-legend { display: none; }
+}
 
 /* ---------- Filter / sort toolbar ----------
    Colours come from the theme variables defined in index.html, which
@@ -1084,6 +1169,7 @@ html.inverted {
     <div class="cmp-modal" role="dialog" aria-modal="true" aria-labelledby="cmp-title">
         <div class="cmp-head">
             <div id="cmp-title" class="cmp-title">Team comparison</div>
+            <span class="cmp-legend"><i></i> best in row</span>
             <button type="button" class="cmp-close" onclick="closeCompare()" aria-label="Close">&#10005;</button>
         </div>
         <div id="cmp-body" class="cmp-body">
@@ -1117,6 +1203,10 @@ html.inverted {
         <div id="tm-number" style="font-size:1.3rem;font-weight:800;color:var(--text);letter-spacing:-0.03em;"></div>
         <div id="tm-nickname" style="font-size:0.82rem;color:var(--muted-text);font-weight:500;"></div>
       </div>
+      <a id="tm-full-link" class="tm-full-link" href="#">
+        Full team page
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+      </a>
       <button id="tm-close-btn" onclick="closeTeamModal()" style="
           background:none;border:none;cursor:pointer;
           color:var(--muted-text);padding:4px;border-radius:8px;
@@ -1139,9 +1229,14 @@ html.inverted {
 // block for position:fixed descendants - that made inset:0 resolve to the
 // content div rather than the viewport, so the dialog sat high instead of centred.
 (function () {
+    // The compare modal and tray need the same treatment: inside the
+    // transformed content div they were clipped to its height, which cut the
+    // comparison in half whenever a search had shortened the board.
     function reparent() {
-        var el = document.getElementById('team-modal-backdrop');
-        if (el && el.parentNode !== document.body) { document.body.appendChild(el); }
+        ['team-modal-backdrop', 'compare-backdrop', 'compare-tray'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el && el.parentNode !== document.body) { document.body.appendChild(el); }
+        });
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', reparent);
@@ -1273,8 +1368,14 @@ html.inverted {
     letter-spacing: 0.04em;
     color: var(--accent);
     border-bottom: 1px solid var(--border);
-    white-space: nowrap;
+    /* Full metric names wrap onto two short lines rather than being abbreviated. */
+    white-space: normal;
+    line-height: 1.15;
+    min-width: 58px;
+    max-width: 96px;
+    vertical-align: bottom;
 }
+.tm-match-table thead th:first-child { min-width: 0; }
 .tm-match-table td {
     padding: 4px 7px;
     border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
@@ -1303,6 +1404,17 @@ html.inverted {
     text-overflow: ellipsis;
 }
 .tm-match-table tr.tm-excluded { opacity: 0.45; text-decoration: line-through; }
+
+.tm-full-link {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 11px; border-radius: 9px;
+    font-size: 0.76rem; font-weight: 700; white-space: nowrap;
+    color: var(--accent); text-decoration: none;
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+    transition: background 0.15s, border-color 0.15s;
+}
+.tm-full-link:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: var(--accent); }
 </style>
 
 <script>
@@ -1343,6 +1455,8 @@ html.inverted {
         content.style.display  = 'none';
         content.innerHTML      = '';
         document.getElementById('tm-number').textContent   = teamNumber;
+        document.getElementById('tm-full-link').href =
+            '/teams/' + encodeURIComponent(teamNumber) + '/' + (comp ? '?comp=' + encodeURIComponent(comp) : '');
         document.getElementById('tm-nickname').textContent = '';
         document.getElementById('tm-logo-wrap').innerHTML  = '';
         document.getElementById('tm-close-btn').focus();
@@ -1443,7 +1557,7 @@ html.inverted {
                 html += '<thead><tr>';
                 html += '<th>M</th>';
                 metrics.slice(0, 6).forEach(function (m) {
-                    html += '<th class="tm-num" title="' + esc(m.display_name) + '">' + esc(abbrev(m.display_name)) + '</th>';
+                    html += '<th class="tm-num">' + esc(m.display_name) + '</th>';
                 });
                 html += '<th class="tm-flagcol"></th>';
                 html += '<th>Notes</th>';
@@ -1491,14 +1605,6 @@ html.inverted {
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') window.closeTeamModal();
     });
-
-    // Column headers carry the full name in a title attribute, so shortening
-    // them here costs nothing and keeps the compact table from wrapping.
-    function abbrev(name) {
-        var words = String(name || '').trim().split(/\s+/);
-        if (words.length === 1) { return words[0].slice(0, 5); }
-        return words.map(function (w) { return w.slice(0, 3); }).join(' ');
-    }
 
     function makePlaceholderSvg() {
         return '<div style="width:48px;height:48px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;">'
@@ -1841,31 +1947,45 @@ window.buildStatChips = function (info) {
     }, true);
 
     function num(v) { return (v === null || v === undefined || v === '') ? null : Number(v); }
-
-    // Mark the best cell in a row so a scan down the table is enough.
-    function highlight(values, higherIsBetter) {
-        var nums = values.map(num).filter(function (v) { return v !== null && !isNaN(v); });
-        if (nums.length < 2) return [];
-        var best = higherIsBetter ? Math.max.apply(null, nums) : Math.min.apply(null, nums);
-        return values.map(function (v) {
-            var k = num(v);
-            return (k !== null && !isNaN(k) && k === best);
-        });
-    }
+    function blank(v) { return v === null || v === undefined || v === ''; }
 
     function esc(v) {
         return String(v === null || v === undefined ? '' : v)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function row(label, values, better) {
-        var flags = better ? highlight(values, better === 'high') : [];
-        return '<tr><th class="cmp-metric">' + esc(label) + '</th>' +
-            values.map(function (v, i) {
-                var blank = (v === null || v === undefined || v === '');
-                return '<td class="' + (flags[i] ? 'cmp-best' : '') + (blank ? ' cmp-na' : '') + '">' +
-                       (blank ? '&mdash;' : esc(v)) + '</td>';
-            }).join('') + '</tr>';
+    // better: 'high' | 'low' | undefined (text rows are not ranked).
+    // opts.bars draws a bar under each number, scaled to the row's largest value.
+    function row(cols, label, values, better, opts) {
+        opts = opts || {};
+        var nums = values.map(num);
+        var valid = nums.filter(function (v) { return v !== null && !isNaN(v); });
+        var best = null;
+        if (better && valid.length > 1) {
+            best = better === 'high' ? Math.max.apply(null, valid) : Math.min.apply(null, valid);
+            if (valid.every(function (v) { return v === best; })) best = null;   // a tie everywhere is not a win
+        }
+        var max = valid.length ? Math.max.apply(null, valid) : 0;
+
+        var cells = values.map(function (v, i) {
+            if (blank(v)) return '<div class="cmp-cell cmp-na">&mdash;</div>';
+            var n = nums[i];
+            var isNum = n !== null && !isNaN(n);
+            var cls = 'cmp-cell' + (isNum ? '' : ' cmp-text') + (isNum && best !== null && n === best ? ' cmp-best' : '');
+            var html = '<span class="cmp-val">' + esc(v) + (opts.unit ? esc(opts.unit) : '') + '</span>';
+            if (opts.bars && isNum && max > 0) {
+                html += '<span class="cmp-bar"><span style="width:' + Math.max(4, Math.round(n / max * 100)) + '%"></span></span>';
+            }
+            return '<div class="' + cls + '">' + html + '</div>';
+        }).join('');
+        return '<div class="cmp-grid cmp-row" style="--cols:' + cols + '"><div class="cmp-label">' + esc(label) + '</div>' + cells + '</div>';
+    }
+
+    function section(title, rowsHtml, note, open) {
+        if (!rowsHtml) return '';
+        return '<details class="cmp-section"' + (open ? ' open' : '') + '>' +
+               '<summary>' + esc(title) + (note ? ' <span class="cmp-count">' + esc(note) + '</span>' : '') + '</summary>' +
+               '<div class="cmp-rows">' + rowsHtml + '</div></details>';
     }
 
     window.openCompare = function () {
@@ -1873,48 +1993,68 @@ window.buildStatChips = function (info) {
         var backdrop = document.getElementById('compare-backdrop');
         var body     = document.getElementById('cmp-body');
         backdrop.hidden = false;
-        body.innerHTML = '<div class="cmp-loading">Loading...</div>';
+        body.innerHTML = '<div class="cmp-loading">Loading&hellip;</div>';
 
         var c = comp();
-        Promise.all(picked.map(function (n) {
-            return fetch('/api/team_info/' + n + '/?comp=' + encodeURIComponent(c) + '&quantifier=Quals', {
+        var teams = picked.slice();
+        var n = teams.length;
+        Promise.all(teams.map(function (t) {
+            return fetch('/api/team_info/' + t + '/?comp=' + encodeURIComponent(c) + '&quantifier=Quals', {
                 credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(function (r) { return r.ok ? r.json() : {}; })
             .catch(function () { return {}; });
         })).then(function (details) {
-            var heads = picked.map(function (n, i) {
-                var info = infoFor(n);
+            // ---- Team header cards (sticky while the sections scroll) ----
+            var html = '<div class="cmp-grid cmp-teams" style="--cols:' + n + '"><div></div>' + teams.map(function (t, i) {
+                var info = infoFor(t);
                 var logo = (details[i] && details[i].logo_url) || info.logo_url;
-                return '<th><div class="cmp-team-head">' +
-                    (logo ? '<img src="' + esc(logo) + '" alt="">' : '') +
-                    '<div>' + n + '<span class="cmp-nick">' + esc(info.nickname || '') + '</span></div>' +
-                    '</div></th>';
-            }).join('');
+                return '<div class="cmp-team-card">' +
+                    (logo ? '<img src="' + esc(logo) + '" alt="">' : '<span class="cmp-logo-ph"></span>') +
+                    '<div class="cmp-team-text">' +
+                        '<div class="cmp-team-num">' + t + '</div>' +
+                        '<div class="cmp-team-nick">' + esc(info.nickname || '') + '</div>' +
+                    '</div>' +
+                    '<a class="cmp-team-link" href="/teams/' + t + '/' + (c ? '?comp=' + encodeURIComponent(c) : '') + '">Team page</a>' +
+                '</div>';
+            }).join('') + '</div>';
 
-            var html = '<table class="cmp-table"><thead><tr><th class="cmp-metric"></th>' + heads + '</tr></thead><tbody>';
+            // ---- Overview ----
+            html += section('Overview',
+                row(n, 'Event rank',      teams.map(function (t) { return infoFor(t).rank; }), 'low') +
+                row(n, 'Matches scouted', teams.map(function (t) { return infoFor(t).matches; }), 'high') +
+                row(n, 'Driver rating',   teams.map(function (t) { return infoFor(t).driver; }), 'high', { bars: true }) +
+                row(n, 'Defense rating',  teams.map(function (t) { return infoFor(t).defense; }), 'high', { bars: true }) +
+                row(n, 'Pit scouted',     details.map(function (d) { return d && d.pit_scout_status ? 'Yes' : 'No'; })),
+                '', true);
 
-            html += row('Event rank',      picked.map(function (n) { return infoFor(n).rank; }), 'low');
-            html += row('Matches scouted', picked.map(function (n) { return infoFor(n).matches; }), 'high');
-            html += row('Driver rating',   picked.map(function (n) { return infoFor(n).driver; }), 'high');
-            html += row('Defense rating',  picked.map(function (n) { return infoFor(n).defense; }), 'high');
-            html += row('Pit scouted',     details.map(function (d) { return d && d.pit_scout_status ? 'Yes' : 'No'; }));
+            // ---- Scoring averages: every metric any of the teams has ----
+            var avgKeys = [], avgMeta = {};
+            details.forEach(function (d) {
+                ((d && d.averages) || []).forEach(function (a) {
+                    if (!avgMeta[a.key]) { avgMeta[a.key] = a; avgKeys.push(a.key); }
+                });
+            });
+            html += section('Scoring averages', avgKeys.map(function (k) {
+                return row(n, avgMeta[k].label, details.map(function (d) {
+                    var hit = ((d && d.averages) || []).find(function (a) { return a.key === k; });
+                    return hit ? hit.value : null;
+                }), 'high', { bars: true, unit: avgMeta[k].unit });
+            }).join(''), avgKeys.length + ' metrics', true);
 
-            // Union of pit keys, so a field only one team answered still shows.
+            // ---- Pit scouting: union of keys, so a field only one team answered still shows ----
             var keys = [];
             details.forEach(function (d) {
-                var pit = (d && d.pit_data) || {};
-                Object.keys(pit).forEach(function (k) { if (keys.indexOf(k) === -1) keys.push(k); });
+                Object.keys((d && d.pit_data) || {}).forEach(function (k) { if (keys.indexOf(k) === -1) keys.push(k); });
             });
             keys.sort();
-            keys.forEach(function (k) {
-                html += row(k.replace(/_/g, ' '), details.map(function (d) {
+            html += section('Pit scouting', keys.map(function (k) {
+                return row(n, k.replace(/_/g, ' '), details.map(function (d) {
                     var v = ((d && d.pit_data) || {})[k];
                     return Array.isArray(v) ? v.join(', ') : v;
                 }));
-            });
+            }).join(''), keys.length + ' fields', keys.length <= 12);
 
-            html += '</tbody></table>';
             body.innerHTML = html;
         });
     };

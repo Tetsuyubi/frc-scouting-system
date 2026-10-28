@@ -110,6 +110,25 @@
     overflow: visible;
 }
 
+/* Wordmark: first word in the text colour, second in the accent, with an
+   underline that sweeps in once the letters have landed. */
+.home-title { position: relative; padding-bottom: 0.18em; }
+.title-char.wm-a { color: var(--text); }
+.title-char.wm-b {
+    color: var(--accent);
+    text-shadow: 0 0 28px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.wm-swoosh {
+    position: absolute;
+    left: 50%; bottom: 0;
+    width: 62%; height: 0.09em;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, var(--accent) 25%, var(--accent) 75%, transparent);
+    transform: translateX(-50%) scaleX(0);
+    animation: wmSwoosh 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.05s forwards;
+}
+@keyframes wmSwoosh { to { transform: translateX(-50%) scaleX(1); } }
+
 .title-char {
     display: inline-block;
     animation: charReveal 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -169,19 +188,45 @@
     text-transform: uppercase;
     white-space: nowrap;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    position: relative;
+    overflow: hidden;
+    /* --i is set per pill in the markup, so every pill joins the cascade. */
     animation: fadeUp 0.5s var(--ease-out) both;
+    animation-delay: calc(0.95s + var(--i, 0) * 0.1s);
+    transition: transform 0.22s var(--ease-spring, ease), border-color 0.18s ease, box-shadow 0.22s ease;
 }
 
-.stats-pill:nth-child(1) { animation-delay: 0.95s; }
-.stats-pill:nth-child(2) { animation-delay: 1.05s; }
-.stats-pill:nth-child(3) { animation-delay: 1.15s; }
+.stats-pill:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* A highlight that travels pill to pill, left to right, then pauses. */
+.stats-pill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 30%, color-mix(in srgb, var(--accent) 22%, transparent) 50%, transparent 70%);
+    transform: translateX(-120%);
+    animation: pillFlow 6s ease-in-out infinite;
+    animation-delay: calc(2s + var(--i, 0) * 0.18s);
+    pointer-events: none;
+}
+
+@keyframes pillFlow {
+    0%   { transform: translateX(-120%); }
+    18%  { transform: translateX(120%); }
+    100% { transform: translateX(120%); }
+}
 
 .stats-divider {
     color: var(--border);
     font-weight: 400;
     font-size: 1rem;
     line-height: 1;
-    animation: fadeUp 0.5s var(--ease-out) 1s both;
+    animation: fadeUp 0.5s var(--ease-out) both;
+    animation-delay: calc(1s + var(--i, 0) * 0.1s);
 }
 
 /* ==========================================================================
@@ -636,14 +681,14 @@ html.inverted .nav-card:hover {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #22c55e;
+    background: #e63946;
     flex-shrink: 0;
     animation: livePulse 2s ease-in-out infinite;
 }
 
 @keyframes livePulse {
-    0%, 100% { opacity: 1;   box-shadow: 0 0 0 0   rgba(34,197,94,0.45); }
-    50%       { opacity: 0.6; box-shadow: 0 0 0 5px rgba(34,197,94,0);    }
+    0%, 100% { opacity: 1;   box-shadow: 0 0 0 0   rgba(230,57,70,0.5); }
+    50%       { opacity: 0.6; box-shadow: 0 0 0 5px rgba(230,57,70,0);   }
 }
 
 /* ==========================================================================
@@ -761,7 +806,6 @@ html.inverted .nav-card::after {
         </div>
 
         <h1 class="home-title" id="hero-title">{{ app_name }}</h1>
-        <p class="home-subtitle">FRC Scouting · Powered by data, built for the field</p>
 
         <!-- CTA buttons -->
         <div class="hero-cta-group">
@@ -781,35 +825,35 @@ html.inverted .nav-card::after {
          LIVE STATS BAR
          ================================================================ -->
     <div class="stats-bar reveal">
-        <span class="stats-pill">
+        <span class="stats-pill" style="--i:0;">
             <span class="stats-live-dot" aria-label="Live"></span>
             EagleScout &middot; 2026
         </span>
-        <span class="stats-divider" aria-hidden="true">&middot;</span>
-        <span class="stats-pill">
+        <span class="stats-divider" style="--i:0;" aria-hidden="true">&middot;</span>
+        <span class="stats-pill" style="--i:1;">
             <!-- Shield icon -->
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             FRC Team 2073
         </span>
-        <span class="stats-divider" aria-hidden="true">&middot;</span>
-        <span class="stats-pill">
+        <span class="stats-divider" style="--i:1;" aria-hidden="true">&middot;</span>
+        <span class="stats-pill" style="--i:2;">
             <!-- Zap icon -->
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             Season 2026
         </span>
         {% if home_stats %}
-        <span class="stats-divider" aria-hidden="true">&middot;</span>
-        <span class="stats-pill" title="Match records scouted at {{ home_stats.comp }}">
+        <span class="stats-divider" style="--i:2;" aria-hidden="true">&middot;</span>
+        <span class="stats-pill" style="--i:3;" title="Match records scouted at {{ home_stats.comp }}">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 4-7"/></svg>
             <span class="stat-num" data-count="{{ home_stats.matches }}">0</span>&nbsp;matches
         </span>
-        <span class="stats-divider" aria-hidden="true">&middot;</span>
-        <span class="stats-pill" title="Teams pit scouted at {{ home_stats.comp }}">
+        <span class="stats-divider" style="--i:3;" aria-hidden="true">&middot;</span>
+        <span class="stats-pill" style="--i:4;" title="Teams pit scouted at {{ home_stats.comp }}">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
             <span class="stat-num" data-count="{{ home_stats.pit_scouted }}">0</span>&nbsp;pit scouted
         </span>
-        <span class="stats-divider" aria-hidden="true">&middot;</span>
-        <span class="stats-pill" title="Distinct scouts who submitted data at {{ home_stats.comp }}">
+        <span class="stats-divider" style="--i:4;" aria-hidden="true">&middot;</span>
+        <span class="stats-pill" style="--i:5;" title="Distinct scouts who submitted data at {{ home_stats.comp }}">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
             <span class="stat-num" data-count="{{ home_stats.scouts }}">0</span>&nbsp;scouts
         </span>
@@ -1003,10 +1047,15 @@ html.inverted .nav-card::after {
     var titleEl = document.getElementById('hero-title');
     if (titleEl) {
         var text = titleEl.textContent.trim();
+        // Two-tone wordmark: split "EagleScout" at its second capital (or at a
+        // space) so the second word can carry the accent.
+        var split = text.indexOf(' ');
+        if (split === -1) { split = text.slice(1).search(/[A-Z]/) + 1; }
+        if (split <= 0) { split = text.length; }
         titleEl.innerHTML = Array.from(text).map(function (ch, i) {
-            return '<span class="title-char" style="--i:' + i + '">'
+            return '<span class="title-char ' + (i < split ? 'wm-a' : 'wm-b') + '" style="--i:' + i + '">'
                 + (ch === ' ' ? '&nbsp;' : ch) + '</span>';
-        }).join('');
+        }).join('') + '<span class="wm-swoosh" aria-hidden="true"></span>';
     }
 
     /* ----------------------------------------------------------------
