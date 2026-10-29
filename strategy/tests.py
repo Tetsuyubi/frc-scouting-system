@@ -332,3 +332,34 @@ class PicklistFourthPickTests(TestCase):
         stamp = body['timestamp']
         again = self.client.get(self.url + f'&timestamp={stamp}').json()
         self.assertEqual(again['status'], 'no_change')
+
+
+class WebStatsTests(TestCase):
+    """The picklist's web chart: six axes, ratings on a fixed 1-5 scale."""
+
+    COMP = 'webtest2026'
+
+    def setUp(self):
+        self.client.defaults['HTTP_HOST'] = 'localhost'
+        self.client.defaults['wsgi.url_scheme'] = 'https'
+        session = self.client.session
+        session['email'] = 'strategist@team2073.com'
+        session['role'] = 'strategist'
+        session.save()
+        for team, tele in ((111, 10), (222, 20)):
+            Team_Match_Data.objects.create(
+                team_number=team, event=self.COMP, match_number=1, scout_name='s', quantifier='Quals',
+                driverRanking=4, defenseRanking=2,
+                data={'teleScore': tele, 'telePass': 1, 'autoPass': 1, 'autoScore': 3},
+            )
+
+    def test_axes_and_scaling(self):
+        data = self.client.get(reverse('web_stats') + f'?comp={self.COMP}').json()
+        axes = {a['key']: a for a in data['axes']}
+        self.assertEqual(len(axes), 6)
+        self.assertEqual(axes['teleScore']['max'], 20)       # best team at the event
+        self.assertEqual(axes['defenseRanking']['max'], 5)   # fixed rating scale
+        self.assertEqual(data['teams']['111']['values']['teleScore'], 10)
+
+    def test_rejects_bad_comp_code(self):
+        self.assertEqual(self.client.get(reverse('web_stats') + '?comp=bad code!').status_code, 400)

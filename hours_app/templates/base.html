@@ -1,10 +1,22 @@
 {% extends "index.html" %}
-{% load static %}
+{% load static hours_tags %}
 
 {% block Title %}{% block title %}EagleForce Hours{% endblock %}{% endblock %}
 
 {% block Styles %}
 <style>
+/* Shown on every hours page between seasons. */
+.season-over {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 16px; margin-bottom: 1.25rem;
+  border-radius: var(--radius-lg, 14px);
+  border: 1px solid color-mix(in srgb, #f59e0b 40%, var(--border));
+  background: color-mix(in srgb, #f59e0b 9%, var(--bg-elevated));
+  color: var(--text); font-size: 0.88rem; line-height: 1.45;
+}
+.season-over svg { color: #d97706; flex-shrink: 0; margin-top: 1px; }
+html.inverted .season-over svg { color: #fbbf24; }
+
 /* ======================================================
    HOURS SUB-NAV
    (page-level chrome unique to the Hours section; everything
@@ -64,6 +76,17 @@
   <a class="hours-subnav-link" href="{% url 'hours:scout_leaderboard' %}">Scouting Leaderboard</a>
   <a class="hours-subnav-link" href="{% url 'hours:check_in_out' %}">Check In / Out</a>
 </nav>
+
+{% hours_season as hs %}
+{% if hs and not hs.is_open %}
+<div class="season-over" role="status">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+  <div>
+    <strong>{{ hs.name }} is over.</strong>
+    Hours tracking is paused until the next season starts. Everything below is from {{ hs.name }} and is read-only.
+  </div>
+</div>
+{% endif %}
 
 {% block content %}{% endblock %}
 {% endblock %}

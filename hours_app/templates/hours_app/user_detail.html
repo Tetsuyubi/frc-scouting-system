@@ -161,7 +161,7 @@
         font-weight:700;
         padding:3px 10px;
         border-radius:999px;">
-        {{ total|floatformat:1 }} total hours
+        {{ total|floatformat:1 }} hours{% if season %} &middot; {{ season.name }}{% endif %}
       </span>
 
       {% if card.badges %}
@@ -198,6 +198,110 @@
     {% endif %}
 
   </div>
+
+  <!-- Mentor-added hours: the form for mentors/leads, the record for everyone -->
+  {% if can_adjust or adjustments %}
+  <div class="adj-card">
+    <div class="adj-head">
+      <div>
+        <div class="adj-title">Added hours</div>
+        <div class="adj-sub">Hours a mentor or lead logged for work done away from the check-in screen.</div>
+      </div>
+    </div>
+
+    {% if can_adjust %}
+    <form method="post" action="{% url 'hours:adjust_hours' student.id %}" class="adj-form">
+      {% csrf_token %}
+      <label class="adj-field adj-hours">
+        <span>Hours</span>
+        <input type="number" name="hours" step="0.25" min="-24" max="24" required placeholder="2.5">
+      </label>
+      <label class="adj-field adj-date">
+        <span>Date worked</span>
+        <input type="date" name="work_date" required value="{{ today }}" min="{{ season_start }}" max="{{ today }}">
+      </label>
+      <label class="adj-field adj-reason">
+        <span>Reason</span>
+        <input type="text" name="reason" required minlength="3" maxlength="255" placeholder="e.g. Outreach event at the library">
+      </label>
+      <button type="submit" class="adj-submit">Add hours</button>
+      <p class="adj-hint">Use a negative number to take hours away.</p>
+    </form>
+    {% endif %}
+
+    {% if adjustments %}
+    <ul class="adj-list">
+      {% for a in adjustments %}
+      <li>
+        <span class="adj-amount{% if a.hours < 0 %} is-neg{% endif %}">{% if a.hours > 0 %}+{% endif %}{{ a.hours|floatformat:"-2" }} h</span>
+        <span class="adj-what">
+          <b>{{ a.reason }}</b>
+          <small>{{ a.work_date|date:"M j, Y" }} &middot; by {% if a.added_by %}{{ a.added_by.get_full_name|default:a.added_by.username }}{% else %}a former member{% endif %}</small>
+        </span>
+        {% if can_adjust %}
+        <form method="post" action="{% url 'hours:delete_adjustment' a.id %}" style="margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="adj-remove" title="Remove this adjustment" aria-label="Remove this adjustment"
+                  onclick="return confirm('Remove this adjustment?')">&times;</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  <style>
+    .adj-card {
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+      padding: 18px 20px; margin-bottom: 20px;
+    }
+    .adj-title { font-size: 0.95rem; font-weight: 800; color: var(--text); }
+    .adj-sub { font-size: 0.78rem; color: var(--muted-text); margin-top: 2px; }
+    .adj-form {
+      display: grid; grid-template-columns: 110px 160px minmax(0, 1fr) auto; gap: 10px; align-items: end;
+      margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
+    }
+    .adj-field { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+    .adj-field span { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted-text); }
+    .adj-field input {
+      width: 100%; padding: 8px 10px; border-radius: var(--radius-md);
+      border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: 0.88rem;
+    }
+    .adj-field input:focus { outline: none; border-color: var(--accent); }
+    .adj-submit {
+      padding: 9px 18px; border: none; border-radius: var(--radius-md);
+      background: var(--accent); color: #fff; font-weight: 700; font-size: 0.86rem; cursor: pointer;
+    }
+    .adj-hint { grid-column: 1 / -1; margin: 0; font-size: 0.72rem; color: var(--muted-text); }
+    .adj-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .adj-list li {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: var(--radius-md);
+      border: 1px solid var(--border); background: var(--bg);
+    }
+    .adj-amount {
+      min-width: 64px; text-align: center; padding: 3px 8px; border-radius: 999px;
+      font-size: 0.78rem; font-weight: 800; color: #16a34a;
+      background: color-mix(in srgb, #22c55e 14%, transparent);
+    }
+    .adj-amount.is-neg { color: #dc2626; background: color-mix(in srgb, #ef4444 12%, transparent); }
+    html.inverted .adj-amount { color: #4ade80; }
+    html.inverted .adj-amount.is-neg { color: #f87171; }
+    .adj-what { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .adj-what b { font-size: 0.86rem; color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+    .adj-what small { font-size: 0.72rem; color: var(--muted-text); }
+    .adj-remove {
+      background: none; border: none; cursor: pointer; color: var(--muted-text);
+      font-size: 1.2rem; line-height: 1; padding: 2px 8px; border-radius: 6px;
+    }
+    .adj-remove:hover { background: var(--border); color: var(--text); }
+    @media (max-width: 720px) {
+      .adj-form { grid-template-columns: 1fr 1fr; }
+      .adj-reason, .adj-submit { grid-column: 1 / -1; }
+    }
+  </style>
+  {% endif %}
 
   <!-- History table card -->
   <div style="

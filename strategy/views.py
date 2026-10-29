@@ -972,3 +972,48 @@ def team_info(request, team_number):
         'averages': average_cards,
         'average_match_count': raw_averages.get('match_count', 0) if raw_averages else 0,
     })
+
+
+# Axes of the picklist's "web stats" chart, clockwise from the top: scoring on
+# the right-hand side, passing and defence on the left. Ratings are on a fixed
+# 1-5 scale; everything else is scaled to the best team at the event.
+WEB_AXES = (
+    ('teleScore',      'Tele scoring', None),
+    ('telePass',       'Tele pass',    None),
+    ('autoPass',       'Auto pass',    None),
+    ('autoScore',      'Auto scoring', None),
+    ('defenseRanking', 'Defense',      5),
+    ('driverRanking',  'Driver skill', 5),
+)
+
+
+@login_required
+@team_member_required
+def web_stats(request):
+    """Per-team averages for the web chart, plus each axis's scale."""
+    comp_code = request.GET.get('comp', '')
+    quantifier = request.GET.get('quantifier', 'Quals')
+    if not comp_code or not _SAFE_COMP_CODE.match(comp_code):
+        return JsonResponse({'error': 'Invalid or missing competition code'}, status=400)
+
+    config = config_loader.get_config()
+    by_team = defaultdict(list)
+    for m in Team_Match_Data.objects.filter(event=comp_code, quantifier=quantifier, is_excluded=False):
+        by_team[m.team_number].append(m)
+
+    teams = {}
+    for team_number, matches in by_team.items():
+        stats = _compute_team_averages(matches, config, exclude_zeros=True)
+        if not stats:
+            continue
+        teams[str(team_number)] = {
+            'values': {key: round(float(stats.get(key) or 0), 2) for key, _, _ in WEB_AXES},
+            'matches': stats.get('match_count', 0),
+        }
+
+    axes = []
+    for key, label, fixed_max in WEB_AXES:
+        best = max((t['values'][key] for t in teams.values()), default=0)
+        axes.append({'key': key, 'label': label, 'max': fixed_max or best or 1, 'rating': bool(fixed_max)})
+
+    return JsonResponse({'axes': axes, 'teams': teams, 'quantifier': quantifier})

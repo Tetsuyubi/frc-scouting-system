@@ -2,7 +2,7 @@ import io
 import json
 import base64
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -13,9 +13,10 @@ from django.db.models import Sum, F, ExpressionWrapper, fields
 from django.contrib.auth.models import User
 
 from .models import (
-    CheckInOut, SeasonRank, UserProfile, Badge,
+    CheckInOut, SeasonRank, UserProfile, Badge, HoursAdjustment,
     SUBTEAM_CHOICES, SUBTEAM_COLORS, BADGE_CHOICES, BADGE_COLORS, BADGE_META, badge_roster,
 )
+from . import seasons
 from authenticate.models import AuthorizedUser
 from helpers import login_required
 
@@ -139,14 +140,21 @@ def dashboard(request):
     if not profile.onboarding_complete:
         return redirect('hours:onboarding')
 
-    active_session = CheckInOut.objects.filter(
-        user=request.user, check_out_time__isnull=True
-    ).first()
+    # Between seasons the dashboard is a read-only view of the season that
+    # just ended, so "this week" means that season's final week.
+    season = seasons.current_season()
+    season_open = seasons.is_open(season)
+    now = timezone.now()
+    anchor = now if season_open else season.ended_at
+    my_sessions = seasons.sessions_in(season, CheckInOut.objects.filter(user=request.user))
+    my_adjustments = seasons.adjustments_in(season, HoursAdjustment.objects.filter(user=request.user)) if season else HoursAdjustment.objects.none()
 
-    one_week_ago = timezone.now() - timedelta(days=7)
-    weekly_stats = CheckInOut.objects.filter(
-        user=request.user,
-        check_in_time__gte=one_week_ago,
+    active_session = my_sessions.filter(check_out_time__isnull=True).first() if season_open else None
+
+    one_week_before = anchor - timedelta(days=7)
+    weekly_stats = my_sessions.filter(
+        check_in_time__gte=one_week_before,
+        check_in_time__lte=anchor,
         check_out_time__isnull=False,
     ).annotate(
         duration_calc=ExpressionWrapper(
@@ -157,7 +165,12 @@ def dashboard(request):
 
     weekly_hours = 0
     if weekly_stats['total']:
-        weekly_hours = round(weekly_stats['total'].total_seconds() / 3600, 1)
+        weekly_hours = weekly_stats['total'].total_seconds() / 3600
+    weekly_hours += my_adjustments.filter(
+        work_date__gt=timezone.localtime(one_week_before).date(),
+        work_date__lte=timezone.localtime(anchor).date(),
+    ).aggregate(s=Sum('hours'))['s'] or 0
+    weekly_hours = round(max(weekly_hours, 0), 1)
 
     season_rank = SeasonRank.objects.filter(user=request.user).first()
     season_hours = round(season_rank.total_hours, 1) if season_rank else 0
@@ -165,7 +178,8 @@ def dashboard(request):
     # Rank position among all ranked users
     ranks_above = SeasonRank.objects.filter(total_hours__gt=season_hours).count()
     total_ranked = SeasonRank.objects.count()
-    rank_position = ranks_above + 1 if total_ranked > 0 else None
+    # No ranking row means no hours logged yet this season: unranked.
+    rank_position = ranks_above + 1 if season_rank else None
 
     # The whole programme, not just what this person has — a locked badge is
     # the only way someone finds out the training exists.
@@ -194,15 +208,89 @@ def dashboard(request):
     comp_code = request.session.get('comp_code', '')
     scouting_stats = _get_scouting_stats(scout_name, comp_code)
 
-    # Who's currently checked in
+    # Who's currently checked in (nobody can be, between seasons)
     checked_in_now = (
         CheckInOut.objects
         .filter(check_out_time__isnull=True)
         .select_related('user')
         .order_by('check_in_time')
-    )
+    ) if season_open else CheckInOut.objects.none()
     checked_in_count = checked_in_now.count()
     checked_in_names = [s.user.get_full_name() or s.user.username for s in checked_in_now[:5]]
+
+    # The hero's week timeline: one row per day, each session drawn where it
+    # actually happened between DAY_START and midnight. A session belongs to
+    # the day it started; an open one runs up to now.
+    DAY_START, DAY_END = 6, 24
+    span = (DAY_END - DAY_START) * 3600
+    today = timezone.localtime(anchor).date()
+    days = [today - timedelta(days=i) for i in range(6, -1, -1)]
+    rows = {d: {'blocks': [], 'total': 0.0, 'added': 0.0} for d in days}
+
+    def clock(dt):
+        return dt.strftime('%I:%M %p').lstrip('0')
+
+    for s in my_sessions.filter(
+        check_in_time__date__gte=days[0], check_in_time__date__lte=today,
+    ).only('check_in_time', 'check_out_time').order_by('check_in_time'):
+        start = timezone.localtime(s.check_in_time)
+        end = timezone.localtime(s.check_out_time or now)
+        day = start.date()
+        if day not in rows:
+            continue
+        hours = max(0.0, (end - start).total_seconds() / 3600)
+        rows[day]['total'] += hours
+        base = start.replace(hour=0, minute=0, second=0, microsecond=0)
+        a_sec = min(max((start - base).total_seconds() - DAY_START * 3600, 0), span)
+        b_sec = min(max((end - base).total_seconds() - DAY_START * 3600, 0), span)
+        rows[day]['blocks'].append({
+            'left': round(a_sec / span * 100, 2),
+            'width': round(max(b_sec - a_sec, span * 0.006) / span * 100, 2),
+            'open': s.check_out_time is None,
+            'tip': f"{clock(start)} – {'now' if s.check_out_time is None else clock(end)} · {hours:.1f} h",
+        })
+    # Mentor-added hours have a date but no time of day: they count toward
+    # the row's total and show as a "+h" mark instead of a block.
+    for adj in my_adjustments.filter(work_date__gte=days[0], work_date__lte=today):
+        rows[adj.work_date]['total'] += adj.hours
+        rows[adj.work_date]['added'] += adj.hours
+    week_rows = [
+        {'day': d.strftime('%a'), 'date': d.day, 'today': d == today and season_open,
+         'total': round(max(rows[d]['total'], 0), 1), 'blocks': rows[d]['blocks'],
+         'added': round(rows[d]['added'], 1)}
+        for d in days
+    ]
+    # Now-line position on today's row, if it falls inside the window.
+    now_local = timezone.localtime(now)
+    now_sec = now_local.hour * 3600 + now_local.minute * 60 - DAY_START * 3600
+    now_pct = round(now_sec / span * 100, 2) if season_open and 0 <= now_sec <= span else None
+
+    # Day streak: consecutive days with any logged time, ending today (or
+    # yesterday, so a streak is not "broken" before today's meeting).
+    logged_days = set(
+        timezone.localtime(t).date() for t in my_sessions.filter(
+            check_in_time__gte=anchor - timedelta(days=120),
+        ).values_list('check_in_time', flat=True)
+    ) | set(my_adjustments.filter(hours__gt=0).values_list('work_date', flat=True))
+    streak = 0
+    cursor = today if today in logged_days else today - timedelta(days=1)
+    while cursor in logged_days:
+        streak += 1
+        cursor -= timedelta(days=1)
+
+    last_out = (
+        my_sessions.filter(check_out_time__isnull=False)
+        .order_by('-check_out_time').values_list('check_out_time', flat=True).first()
+    )
+
+    def initials(u):
+        first, last = (u.first_name or '').strip(), (u.last_name or '').strip()
+        return ((first[:1] + last[:1]) or (u.username or '?')[:2]).upper()
+
+    checked_in_faces = [
+        {'initials': initials(s.user), 'name': s.user.get_full_name() or s.user.username}
+        for s in checked_in_now[:6]
+    ]
 
     check_in_url = request.build_absolute_uri(reverse('hours:check_in_out'))
 
@@ -224,6 +312,16 @@ def dashboard(request):
         'total_ranked': total_ranked,
         'checked_in_count': checked_in_count,
         'checked_in_names': checked_in_names,
+        'checked_in_faces': checked_in_faces,
+        'week_rows': week_rows,
+        'now_pct': now_pct,
+        'day_streak': streak,
+        'last_out': last_out,
+        # One tick per hour of the 40-hour weekly goal, lit up to the hours logged.
+        'goal_ticks': [i < int(weekly_hours) for i in range(40)],
+        'first_name': request.user.first_name or (request.user.get_full_name() or request.user.username).split(' ')[0],
+        'season': season,
+        'season_open': season_open,
     })
 
 
@@ -453,6 +551,16 @@ def check_in_out(request):
         user=request.user, check_out_time__isnull=True
     ).first()
 
+    # Between seasons nobody can check in. Checking out stays possible so a
+    # session left open by mistake can still be closed.
+    season = seasons.current_season()
+    if not seasons.is_open(season) and not active_session:
+        if request.method == 'POST':
+            messages.error(request, f'{season.name} is over. Check-ins open again when the next season starts.')
+        return render(request, 'hours_app/check_in_out.html', {
+            'active_session': None, 'season_closed': True, 'season': season,
+        })
+
     if request.method == 'POST':
         action = request.POST.get('action')
         reason = request.POST.get('reason', '').strip()[:255]
@@ -495,20 +603,8 @@ def check_in_out(request):
 
 
 def _update_season_rank(user):
-    result = CheckInOut.objects.filter(
-        user=user, check_out_time__isnull=False
-    ).annotate(
-        dur=ExpressionWrapper(
-            F('check_out_time') - F('check_in_time'),
-            output_field=fields.DurationField()
-        )
-    ).aggregate(total=Sum('dur'))
-
-    total_hours = 0.0
-    if result['total']:
-        total_hours = round(result['total'].total_seconds() / 3600, 2)
-
-    SeasonRank.objects.update_or_create(user=user, defaults={'total_hours': total_hours})
+    # Current season only: sessions inside its window plus mentor adjustments.
+    seasons.update_season_rank(user)
 
 
 def rankings(request):
@@ -542,7 +638,12 @@ def rankings(request):
             'avatar_url': prof.avatar_url if prof else '',
             'initials': prof.initials if prof else (r.user.username or '?')[:2].upper(),
         })
-    return render(request, 'hours_app/rankings.html', {'rankings': rankings_list})
+    season = seasons.current_season()
+    return render(request, 'hours_app/rankings.html', {
+        'rankings': rankings_list,
+        'season': season,
+        'season_open': seasons.is_open(season),
+    })
 
 
 @login_required
@@ -648,17 +749,81 @@ def toggle_badge(request):
 @login_required
 def user_detail(request, user_id):
     student = get_object_or_404(User, id=user_id)
-    logs = CheckInOut.objects.filter(user=student).order_by('-check_in_time')
-    total_seconds = sum(
-        (log.check_out_time - log.check_in_time).total_seconds()
-        for log in logs
-        if log.check_in_time and log.check_out_time
+    season = seasons.current_season()
+    logs = seasons.sessions_in(season, CheckInOut.objects.filter(user=student)).order_by('-check_in_time')
+    adjustments = (
+        seasons.adjustments_in(season, HoursAdjustment.objects.filter(user=student)).select_related('added_by')
+        if season else HoursAdjustment.objects.none()
     )
+    can_moderate = _may_moderate(request)
     return render(request, 'hours_app/user_detail.html', {
         'student': student,
         'logs': logs,
-        'total': round(total_seconds / 3600, 2),
+        'adjustments': adjustments,
+        'total': seasons.season_hours(student, season),
         'card': _profile_card(student),
-        'can_moderate': _may_moderate(request),
+        'can_moderate': can_moderate,
+        # Mentors add hours for other people, never for themselves.
+        'can_adjust': can_moderate and student.id != request.user.id and seasons.is_open(season) and season is not None,
         'is_self': student.id == request.user.id,
+        'season': season,
+        'season_open': seasons.is_open(season),
+        'today': timezone.localdate().isoformat(),
+        'season_start': timezone.localtime(season.started_at).date().isoformat() if season else '',
     })
+
+
+@login_required
+def adjust_hours(request, user_id):
+    """A mentor or lead adds (or removes) hours for a member."""
+    if request.method != 'POST':
+        return redirect('hours:user_detail', user_id=user_id)
+    student = get_object_or_404(User, id=user_id)
+    if not _may_moderate(request) or student.id == request.user.id:
+        messages.error(request, 'Only mentors and leads can add hours, and not for themselves.')
+        return redirect('hours:user_detail', user_id=user_id)
+
+    season = seasons.current_season()
+    if season is None or not season.is_open:
+        messages.error(request, 'Hours can only be added while a season is open.')
+        return redirect('hours:user_detail', user_id=user_id)
+
+    try:
+        hours = round(float(request.POST.get('hours', '')), 2)
+    except ValueError:
+        hours = 0
+    reason = request.POST.get('reason', '').strip()[:255]
+    try:
+        work_date = datetime.strptime(request.POST.get('work_date', ''), '%Y-%m-%d').date()
+    except ValueError:
+        work_date = None
+
+    if not hours or abs(hours) > 24:
+        messages.error(request, 'Enter between 0.25 and 24 hours (use a negative number to remove hours).')
+    elif len(reason) < 3:
+        messages.error(request, 'Add a short reason so the record makes sense later.')
+    elif (work_date is None or work_date > timezone.localdate()
+          or work_date < timezone.localtime(season.started_at).date()):
+        messages.error(request, 'Pick a date in this season, not in the future.')
+    else:
+        HoursAdjustment.objects.create(
+            user=student, season=season, hours=hours,
+            work_date=work_date, reason=reason, added_by=request.user,
+        )
+        _update_season_rank(student)
+        name = student.get_full_name() or student.username
+        messages.success(request, f"{'Added' if hours > 0 else 'Removed'} {abs(hours):g} h for {name}.")
+    return redirect('hours:user_detail', user_id=user_id)
+
+
+@login_required
+def delete_adjustment(request, adjustment_id):
+    adjustment = get_object_or_404(HoursAdjustment, id=adjustment_id)
+    user_id = adjustment.user_id
+    if request.method == 'POST' and _may_moderate(request) and adjustment.season.is_open:
+        adjustment.delete()
+        _update_season_rank(adjustment.user)
+        messages.success(request, 'Hours adjustment removed.')
+    else:
+        messages.error(request, 'That adjustment cannot be removed.')
+    return redirect('hours:user_detail', user_id=user_id)

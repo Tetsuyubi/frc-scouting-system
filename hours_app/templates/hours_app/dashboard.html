@@ -767,198 +767,347 @@
   text-decoration: none;
 }
 .dash-card.scout-link:hover .scout-card-hint { opacity: 1; }
+
+/* ======================================================
+   SHIFT CLOCK HERO
+   Built around time rather than the scouting console: a dial whose 40 ticks
+   are the weekly goal hours, and a week timeline showing when they happened.
+====================================================== */
+.sc {
+  --dial: 320px;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  margin-bottom: 28px;
+  padding: 2rem 2.25rem 2.25rem;
+  border-radius: 28px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(90% 120% at 0% 100%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 55%),
+    var(--bg-elevated);
+}
+.sc.is-on { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+/* Faint concentric rings radiating from the dial, like a clock face. */
+.sc-rings {
+  position: absolute; z-index: -1; inset: 0; pointer-events: none;
+  background: repeating-radial-gradient(circle at 210px 58%,
+              transparent 0 38px,
+              color-mix(in srgb, var(--text) 5%, transparent) 38px 39px);
+  -webkit-mask-image: radial-gradient(circle at 210px 58%, #000 0, transparent 520px);
+          mask-image: radial-gradient(circle at 210px 58%, #000 0, transparent 520px);
+}
+
+.sc-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.75rem; }
+.sc-kicker { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.35rem; }
+.sc-hello { margin: 0; font-size: clamp(1.5rem, 2.6vw, 2.1rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; color: var(--text); }
+.sc-hello span { color: var(--muted-text); font-weight: 600; }
+.sc.is-on .sc-hello span { color: var(--accent); }
+
+.sc-faces { display: inline-flex; align-items: center; gap: 0.65rem; text-decoration: none; color: var(--muted-text); }
+.sc-faces-stack { display: inline-flex; }
+.sc-face {
+  width: 34px; height: 34px; margin-left: -9px;
+  border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 800; color: var(--text);
+  background: var(--bg); border: 2px solid var(--bg-elevated);
+  box-shadow: 0 0 0 1px var(--border);
+  transition: transform 0.18s ease;
+}
+.sc-face:first-child { margin-left: 0; }
+.sc-face.is-more { color: var(--muted-text); }
+.sc-faces:hover .sc-face { transform: translateY(-2px); }
+.sc-faces-label { font-size: 0.82rem; }
+.sc-faces-label b { color: var(--text); }
+.sc-faces:hover .sc-faces-label { color: var(--accent); }
+
+.sc-body { display: grid; grid-template-columns: var(--dial) minmax(0, 1fr); gap: 2.75rem; align-items: start; }
+.sc-left { display: flex; flex-direction: column; align-items: center; gap: 1.1rem; }
+
+/* ---- Dial ---- */
+.sc-dial {
+  position: relative; width: var(--dial); height: var(--dial);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--bg-elevated) 0 58%, transparent 58.5%),
+    radial-gradient(circle, color-mix(in srgb, var(--accent) 7%, var(--bg)) 0 100%);
+  box-shadow: inset 0 0 0 1px var(--border), 0 18px 50px rgba(0,0,0,0.18);
+}
+/* 40 ticks, one per goal hour; lit ones are hours already logged this week. */
+.sc-tick {
+  position: absolute; left: 50%; top: 10px;
+  width: 4px; height: 20px; margin-left: -2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--muted-text) 30%, transparent);
+  transform-origin: 2px calc(var(--dial) / 2 - 10px);
+  transform: rotate(calc(var(--i) * 9deg));
+}
+.sc-tick.is-lit {
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 55%, transparent);
+  animation: scTick 0.4s ease both;
+  animation-delay: calc(0.2s + var(--i) * 30ms);
+}
+@keyframes scTick { from { background: color-mix(in srgb, var(--muted-text) 30%, transparent); box-shadow: none; } }
+
+/* Second hand: a dot that laps the inner face once a minute while on the clock. */
+.sc-sweep { position: absolute; inset: 44px; border-radius: 50%; animation: scSweep 60s linear infinite; }
+.sc-sweep i {
+  position: absolute; left: 50%; top: -4px; width: 8px; height: 8px; margin-left: -4px;
+  border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent), 0 0 14px var(--accent);
+}
+@keyframes scSweep { to { transform: rotate(360deg); } }
+
+.sc-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem;
+  text-align: center;
+}
+.sc-state {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted-text);
+}
+.sc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted-text); }
+.sc.is-on .sc-state { color: var(--accent); }
+.sc.is-on .sc-dot { background: var(--accent); animation: scPulse 2s ease-in-out infinite; }
+@keyframes scPulse { 50% { opacity: 0.35; } }
+.sc-time {
+  font-size: 2.6rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1;
+  color: var(--text); font-variant-numeric: tabular-nums;
+}
+.sc-time small { font-size: 0.5em; font-weight: 700; color: var(--muted-text); margin-left: 2px; }
+.sc-sub { font-size: 0.76rem; color: var(--muted-text); }
+.sc-goal {
+  margin-top: 0.35rem; padding: 0.2rem 0.6rem; border-radius: 999px;
+  font-size: 0.7rem; font-weight: 700; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border);
+}
+
+.sc-punch {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  min-width: 200px; padding: 0.75rem 1.6rem; border-radius: 999px;
+  font-weight: 800; font-size: 0.95rem; text-decoration: none;
+  color: #fff !important; background: var(--accent);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s ease;
+}
+.sc-punch:hover { transform: translateY(-2px); box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 50%, transparent); }
+.sc-punch.is-out { color: var(--accent) !important; background: transparent; border: 2px solid var(--accent); box-shadow: none; }
+.sc-punch.is-out:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+/* ---- Week timeline ---- */
+.sc-label { font-size: 0.74rem; font-weight: 700; color: var(--muted-text); }
+.sc-week-head { display: grid; grid-template-columns: 54px minmax(0, 1fr) 48px; row-gap: 0.5rem; align-items: end; margin-bottom: 0.4rem; }
+.sc-week-head .sc-label { grid-column: 1 / -1; }
+.sc-scale { grid-column: 2; position: relative; height: 1rem; }
+.sc-scale span { position: absolute; transform: translateX(-50%); font-size: 0.64rem; font-weight: 600; color: var(--muted-text); }
+.sc-row {
+  display: grid; grid-template-columns: 54px minmax(0, 1fr) 48px; align-items: center;
+  padding: 0.3rem 0;
+  animation: scRow 0.5s cubic-bezier(0.22,1,0.36,1) both;
+  animation-delay: calc(0.1s + var(--r) * 60ms);
+}
+@keyframes scRow { from { opacity: 0; transform: translateX(-10px); } }
+.sc-day { display: flex; align-items: baseline; gap: 0.3rem; }
+.sc-day b { font-size: 0.8rem; color: var(--text); }
+.sc-day span { font-size: 0.7rem; color: var(--muted-text); }
+.sc-row.is-today .sc-day b { color: var(--accent); }
+.sc-track {
+  position: relative; height: 26px; border-radius: 8px;
+  background:
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--border) 80%, transparent) 0 1px, transparent 1px 16.6667%),
+    color-mix(in srgb, var(--bg) 70%, transparent);
+  border: 1px solid var(--border);
+}
+.sc-row.is-today .sc-track { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.sc-block {
+  position: absolute; top: 4px; bottom: 4px; min-width: 4px;
+  border-radius: 5px;
+  /* Past days are a softer step of the accent; today's row is full strength. */
+  background: color-mix(in srgb, var(--accent) 60%, var(--bg-elevated));
+  outline: none; cursor: default;
+  transform-origin: left; animation: scGrow 0.6s cubic-bezier(0.22,1,0.36,1) both;
+  animation-delay: calc(0.25s + var(--r, 0) * 60ms);
+}
+.sc-row.is-today .sc-block { background: var(--accent); }
+.sc-block:hover, .sc-block:focus-visible { background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
+.sc-block.is-open { background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, transparent)); }
+.sc-block.is-open::before {
+  content: ''; position: absolute; right: -3px; top: 50%; width: 8px; height: 8px; margin-top: -4px;
+  border-radius: 50%; background: var(--accent); animation: scPulse 1.6s ease-in-out infinite;
+}
+@keyframes scGrow { from { transform: scaleX(0); } }
+.sc-block::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px);
+  padding: 0.25rem 0.55rem; border-radius: 7px;
+  background: var(--text); color: var(--bg);
+  font-size: 0.7rem; font-weight: 700; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity 0.12s, transform 0.12s; z-index: 4;
+}
+.sc-block:hover::after, .sc-block:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+.sc-now {
+  position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px;
+  background: var(--text); border-radius: 1px; opacity: 0.6;
+}
+.sc-total { text-align: right; font-size: 0.8rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.sc-total.is-zero { color: var(--muted-text); font-weight: 500; }
+
+.sc-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 1.5rem 0 0;
+  border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+}
+.sc-stats > div { padding: 0.75rem 1rem; border-left: 1px solid var(--border); }
+.sc-stats > div:first-child { border-left: none; }
+.sc-stats dt { font-size: 0.7rem; font-weight: 600; color: var(--muted-text); }
+.sc-stats dd { margin: 0.15rem 0 0; font-size: 1.3rem; font-weight: 800; letter-spacing: -0.03em; color: var(--text); font-variant-numeric: tabular-nums; }
+.sc-stats small { font-size: 0.7rem; font-weight: 600; color: var(--muted-text); }
+
+.sc-links { display: flex; flex-wrap: wrap; gap: 1.25rem; margin-top: 1rem; }
+.sc-links a { font-size: 0.82rem; font-weight: 700; color: var(--muted-text); text-decoration: none; border-bottom: 1px solid transparent; }
+.sc-links a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Between seasons: the hero stays, but greys out and drops the check-in. */
+.sc.is-closed { border-color: color-mix(in srgb, #f59e0b 35%, var(--border)); }
+.sc.is-closed .sc-hello span { color: #d97706; }
+html.inverted .sc.is-closed .sc-hello span { color: #fbbf24; }
+.sc.is-closed .sc-tick.is-lit { background: color-mix(in srgb, var(--accent) 45%, var(--muted-text)); box-shadow: none; }
+.sc-closed-tag {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.35rem 0.75rem; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 700; color: var(--muted-text);
+  border: 1px solid var(--border); background: var(--bg);
+}
+.sc-punch.is-locked {
+  color: var(--muted-text) !important; background: var(--bg);
+  border: 1px dashed var(--border); box-shadow: none; cursor: not-allowed;
+}
+.sc-punch.is-locked:hover { transform: none; box-shadow: none; }
+.sc-added {
+  margin-right: 0.35rem; padding: 0 0.3rem; border-radius: 5px;
+  font-size: 0.66rem; font-weight: 800; color: #16a34a;
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+}
+html.inverted .sc-added { color: #4ade80; }
+
+@media (max-width: 1000px) {
+  .sc-body { grid-template-columns: 1fr; gap: 2rem; }
+  .sc-rings { background-position: center; -webkit-mask-image: none; mask-image: none; opacity: 0.5; }
+}
+@media (max-width: 640px) {
+  .sc { --dial: 260px; padding: 1.25rem 1rem 1.25rem; border-radius: 22px; }
+  .sc-head { flex-direction: column; align-items: flex-start; gap: 0.9rem; margin-bottom: 1.25rem; }
+  .sc-hello { font-size: 1.35rem; }
+  .sc-tick { top: 8px; width: 3px; height: 15px; margin-left: -1.5px; transform-origin: 1.5px calc(var(--dial) / 2 - 8px); }
+  .sc-sweep { inset: 34px; }
+  .sc-time { font-size: 2.1rem; }
+  .sc-punch { width: 100%; }
+  .sc-week-head, .sc-row { grid-template-columns: 44px minmax(0, 1fr) 40px; }
+  .sc-scale span:nth-child(even) { display: none; }
+  .sc-day span { display: none; }
+  .sc-track { height: 22px; }
+  .sc-stats { grid-template-columns: repeat(2, 1fr); }
+  .sc-stats > div:nth-child(3) { border-left: none; }
+  .sc-stats > div:nth-child(n+3) { border-top: 1px solid var(--border); }
+  .sc-links { gap: 0.9rem; }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <div>
-    <h1 class="page-title">Dashboard</h1>
-    <p class="page-subtitle">{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% endif %}</p>
-  </div>
-</div>
+<!-- ====================================================
+     SHIFT CLOCK: a dial for the weekly goal and the live session, and a
+     timeline of when this week's hours actually happened.
+==================================================== -->
+<section class="sc{% if checked_in_session %} is-on{% endif %}{% if not season_open %} is-closed{% endif %}" id="shift">
+  <div class="sc-rings" aria-hidden="true"></div>
 
-<div class="dashboard-grid">
-
-  <!-- Column 1: Session Status -->
-  <div class="dash-card reveal">
-    <div class="card-header">Session Status</div>
-    <div class="card-body">
-      {% if checked_in_session %}
-        <div class="status-indicator">
-          <span class="status-dot active"></span>
-          <span>Checked In</span>
-        </div>
-        <div class="checkin-time">Since {{ checked_in_session.check_in_time|time:"g:i A" }}</div>
-        <div class="timer-wrap">
-          <div id="live-timer">00:00:00</div>
-          <div class="timer-label">Session Duration</div>
-        </div>
-      {% else %}
-        <div class="status-indicator">
-          <span class="status-dot inactive"></span>
-          <span style="color:var(--muted-text);">Not Checked In</span>
-        </div>
-        <div class="timer-wrap" style="opacity:0.45;">
-          <div class="timer-inactive">--:--:--</div>
-          <div class="timer-label">No active session</div>
-        </div>
-      {% endif %}
-      <!-- Who's in right now -->
-      <a href="{% url 'hours:checked_in' %}" style="text-decoration:none;display:block;margin:14px 0 4px;">
-        <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:color-mix(in srgb,var(--accent) 6%,var(--bg-elevated));border:1px solid color-mix(in srgb,var(--accent) 18%,var(--border));border-radius:var(--radius-md);transition:background 0.15s;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:0.8rem;font-weight:700;color:var(--text);">
-              {{ checked_in_count }} person{{ checked_in_count|pluralize }} checked in now
-            </div>
-            {% if checked_in_names %}
-            <div style="font-size:0.7rem;color:var(--muted-text);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              {{ checked_in_names|join:", " }}{% if checked_in_count > 5 %}&hellip;{% endif %}
-            </div>
-            {% endif %}
-          </div>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-text);flex-shrink:0;"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-      </a>
-
-      <div class="card-action">
-        <a href="{% url 'hours:check_in_out' %}" class="btn-primary" style="width:100%;box-sizing:border-box;">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            {% if checked_in_session %}
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-            {% else %}
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-            <polyline points="10 17 15 12 10 7"/>
-            <line x1="15" y1="12" x2="3" y2="12"/>
-            {% endif %}
-          </svg>
-          {% if checked_in_session %}Check Out{% else %}Check In{% endif %}
-        </a>
-      </div>
-      <a href="{% url 'hours:user_detail' user.id %}" style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:8px 10px;border-radius:var(--radius-md);background:color-mix(in srgb,var(--accent) 5%,var(--bg));border:1px solid var(--border);text-decoration:none;color:var(--muted-text);font-size:0.78rem;font-weight:600;transition:color 0.15s,border-color 0.15s;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        View my session history
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:auto;"><polyline points="9 18 15 12 9 6"/></svg>
-      </a>
+  <header class="sc-head">
+    <div>
+      <div class="sc-kicker">EagleForce Hours</div>
+      <h1 class="sc-hello">Hi {{ first_name }}, <span>{% if not season_open %}{{ season.name }} is over.{% elif checked_in_session %}you're on the clock.{% else %}you're off the clock.{% endif %}</span></h1>
     </div>
-  </div>
+    {% if season_open %}
+    <a class="sc-faces" href="{% url 'hours:checked_in' %}" aria-label="{{ checked_in_count }} people checked in now">
+      <span class="sc-faces-stack">
+        {% for f in checked_in_faces %}<span class="sc-face" title="{{ f.name }}">{{ f.initials }}</span>{% endfor %}
+        {% if checked_in_count > 6 %}<span class="sc-face is-more">+{{ checked_in_count|add:"-6" }}</span>{% endif %}
+      </span>
+      <span class="sc-faces-label"><b>{{ checked_in_count }}</b> in the shop now</span>
+    </a>
+    {% else %}
+    <span class="sc-closed-tag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Read-only until next season</span>
+    {% endif %}
+  </header>
 
-  <!-- Column 2: Hours Stats -->
-  <div class="dash-card reveal reveal-delay-1">
-    <div class="card-header">My Hours</div>
-    <div class="card-body">
-      <div class="stat-label">This Week</div>
-      <div>
-        <span class="stat-number">{{ weekly_hours|floatformat:1 }}</span>
-        <span class="stat-unit">hrs</span>
-      </div>
-      <div class="stat-sub">of 40 hour weekly goal</div>
-      <div class="progress-track">
-        <div class="progress-fill" id="weekly-progress" style="width:0%;"></div>
-      </div>
-      <div class="progress-legend">
-        <span>0 hrs</span>
-        <span>40 hrs</span>
-      </div>
-      <div class="stats-split">
-        <div class="stats-split-item">
-          <div class="stats-split-num">{{ season_hours|floatformat:1 }}<span class="stats-split-unit"> hrs</span></div>
-          <div class="stats-split-label">Season Total</div>
-        </div>
-        <div class="stats-split-item">
-          {% if rank_position %}
-          <div class="stats-split-num">#{{ rank_position }}<span class="stats-split-unit"> / {{ total_ranked }}</span></div>
-          <div class="stats-split-label">Season Rank</div>
+  <div class="sc-body">
+    <div class="sc-left">
+      <div class="sc-dial" role="img" aria-label="{{ weekly_hours|floatformat:1 }} of 40 goal hours this week">
+        {% for lit in goal_ticks %}<span class="sc-tick{% if lit %} is-lit{% endif %}" style="--i:{{ forloop.counter0 }}"></span>{% endfor %}
+        {% if checked_in_session %}<span class="sc-sweep" id="sc-sweep" aria-hidden="true"><i></i></span>{% endif %}
+        <div class="sc-center">
+          <span class="sc-state"><span class="sc-dot"></span>{% if not season_open %}Season over{% elif checked_in_session %}On the clock{% else %}Off the clock{% endif %}</span>
+          {% if not season_open %}
+            <div class="sc-time is-idle">{{ season_hours|floatformat:1 }}<small>h</small></div>
+            <span class="sc-sub">final season total{% if rank_position %} &middot; #{{ rank_position }}{% endif %}</span>
+          {% elif checked_in_session %}
+            <div class="sc-time js-live-timer">00:00:00</div>
+            <span class="sc-sub">since {{ checked_in_session.check_in_time|time:"g:i A" }}</span>
           {% else %}
-          <div class="stats-split-num" style="color:var(--border);">—</div>
-          <div class="stats-split-label">Season Rank</div>
+            <div class="sc-time is-idle">{{ weekly_hours|floatformat:1 }}<small>h</small></div>
+            <span class="sc-sub">{% if last_out %}last out {{ last_out|date:"D g:i A" }}{% else %}no sessions yet{% endif %}</span>
           {% endif %}
+          <span class="sc-goal">{{ weekly_hours|floatformat:1 }} / 40 hrs {% if season_open %}this week{% else %}final week{% endif %}</span>
         </div>
       </div>
+      {% if not season_open %}
+      <span class="sc-punch is-locked"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Check-ins open next season</span>
+      {% else %}
+      <a class="sc-punch{% if checked_in_session %} is-out{% endif %}" href="{% url 'hours:check_in_out' %}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">{% if checked_in_session %}<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>{% else %}<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>{% endif %}</svg>
+        {% if checked_in_session %}Check out{% else %}Check in{% endif %}
+      </a>
+      {% endif %}
     </div>
-  </div>
 
-  <!-- Column 3: Scouting Activity -->
-  <a class="dash-card scout-link reveal reveal-delay-2" href="{% url 'hours:scout_leaderboard' %}" style="text-decoration:none;color:inherit;display:block;">
-    <div class="card-header">Scouting Activity</div>
-    <div class="card-body">
-      {% if scouting_stats.scout_name %}
-        <div class="stat-label">This Event</div>
-        <div>
-          <span class="stat-number">{{ scouting_stats.total_event }}</span>
-          <span class="stat-unit">matches</span>
-        </div>
-        <div class="stat-sub" style="margin-top:6px;">
-          {{ scouting_stats.total_all }} total across all events
-        </div>
-        <div class="scout-rank-row">
-          <div>
-            {% if scouting_stats.scout_rank %}
-              <div class="scout-rank-num">#{{ scouting_stats.scout_rank }}<span class="scout-rank-of"> / {{ scouting_stats.total_scouts }}</span></div>
-              <div class="scout-rank-label">Scout Rank</div>
-            {% else %}
-              <div class="scout-rank-num" style="color:var(--border);">—</div>
-              <div class="scout-rank-label">Scout Rank</div>
-            {% endif %}
+    <div class="sc-right">
+      <div class="sc-week">
+        <div class="sc-week-head">
+          <span class="sc-label">{% if season_open %}This week{% else %}Final week of {{ season.name }}{% endif %}</span>
+          <div class="sc-scale" aria-hidden="true">
+            <span style="left:0%">6a</span><span style="left:16.667%">9a</span><span style="left:33.333%">12p</span>
+            <span style="left:50%">3p</span><span style="left:66.667%">6p</span><span style="left:83.333%">9p</span><span style="left:100%">12a</span>
           </div>
         </div>
-      {% else %}
-        <div style="color:var(--muted-text);font-size:0.85rem;text-align:center;padding:24px 0;">
-          No scouting data linked yet.
+        {% for row in week_rows %}
+        <div class="sc-row{% if row.today %} is-today{% endif %}" style="--r:{{ forloop.counter0 }}">
+          <div class="sc-day"><b>{{ row.day }}</b><span>{{ row.date }}</span></div>
+          <div class="sc-track">
+            {% for b in row.blocks %}<span class="sc-block{% if b.open %} is-open{% endif %}" style="left:{{ b.left|stringformat:'s' }}%;width:{{ b.width|stringformat:'s' }}%" tabindex="0" data-tip="{{ b.tip }}"></span>{% endfor %}
+            {% if row.today and now_pct is not None %}<span class="sc-now" style="left:{{ now_pct|stringformat:'s' }}%" aria-hidden="true"></span>{% endif %}
+          </div>
+          <div class="sc-total{% if not row.total %} is-zero{% endif %}">{% if row.added %}<span class="sc-added" title="Added by a mentor">{% if row.added > 0 %}+{% endif %}{{ row.added|floatformat:1 }}</span>{% endif %}{{ row.total|floatformat:1 }}h</div>
         </div>
-      {% endif %}
-      <div class="scout-card-hint">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
-        View leaderboard
+        {% endfor %}
       </div>
-    </div>
-  </a>
 
-  <!-- Column 4: Quick Nav -->
-  <div class="dash-card reveal reveal-delay-3">
-    <div class="card-header">Quick Nav</div>
-    <div class="card-body">
-      <div class="nav-grid">
-        <a href="{% url 'hours:checked_in' %}" class="nav-tile">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-          Who's In
-        </a>
-        <a href="{% url 'hours:rankings' %}" class="nav-tile">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-            <polyline points="17 6 23 6 23 12"/>
-          </svg>
-          Rankings
-        </a>
-        <a href="{% url 'hours:check_in_out' %}" class="nav-tile">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-          Log Hours
-        </a>
-        <a href="/admin-panel/" class="nav-tile">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7"/>
-            <rect x="14" y="3" width="7" height="7"/>
-            <rect x="14" y="14" width="7" height="7"/>
-            <rect x="3" y="14" width="7" height="7"/>
-          </svg>
-          Admin
-        </a>
-      </div>
+      <dl class="sc-stats">
+        <div><dt>{% if season_open %}Season total{% else %}Final total{% endif %}</dt><dd>{{ season_hours|floatformat:1 }}<small> hrs</small></dd></div>
+        <div><dt>Season rank</dt><dd>{% if rank_position %}#{{ rank_position }}<small> / {{ total_ranked }}</small>{% else %}&mdash;{% endif %}</dd></div>
+        <div><dt>Day streak</dt><dd>{{ day_streak }}<small> day{{ day_streak|pluralize }}</small></dd></div>
+        <div><dt>Badges</dt><dd>{{ earned_count }}<small> / {{ badge_total }}</small></dd></div>
+      </dl>
+
+      <nav class="sc-links" aria-label="Hours shortcuts">
+        <a href="{% url 'hours:user_detail' user.id %}">Session history</a>
+        <a href="{% url 'hours:rankings' %}">Leaderboard</a>
+        <a href="{% url 'hours:scout_leaderboard' %}">Scouting{% if scouting_stats.scout_rank %} #{{ scouting_stats.scout_rank }}{% endif %}</a>
+        {% if request.session.is_admin %}<a href="/admin-panel/">Admin</a>{% endif %}
+      </nav>
     </div>
   </div>
-
-</div>
+</section>
 
 <!-- ====================================================
      SIGN-IN QR
@@ -1156,16 +1305,10 @@
 
 <script>
 (function(){
-  /* Weekly progress bar */
-  var pct = Math.min(100, ({{ weekly_hours|default:0 }} / 40) * 100);
-  var fill = document.getElementById('weekly-progress');
-  if (fill) {
-    requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
-        fill.style.width = pct.toFixed(1) + '%';
-      });
-    });
-  }
+  /* Shift clock: start the second hand where the real clock's seconds are,
+     so the dot and the timer tick together. */
+  var sweep = document.getElementById('sc-sweep');
+  if (sweep) { sweep.style.animationDelay = -(new Date().getSeconds()) + 's'; }
 })();
 
 /* Training progress bar */
@@ -1294,8 +1437,9 @@
 /* Live timer */
 (function(){
   var checkInIso = "{{ check_in_time_iso|default:'' }}";
-  var timer = document.getElementById('live-timer');
-  if (!timer || !checkInIso) return;
+  // The desktop console and the phone card each show the running session.
+  var timers = document.querySelectorAll('.js-live-timer');
+  if (!timers.length || !checkInIso) return;
   var start = new Date(checkInIso);
   function update() {
     var diff = Date.now() - start.getTime();
@@ -1303,7 +1447,8 @@
     var h = Math.floor(diff / 3600000);
     var m = Math.floor((diff % 3600000) / 60000);
     var s = Math.floor((diff % 60000) / 1000);
-    timer.textContent = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    var text = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    timers.forEach(function (t) { t.textContent = text; });
   }
   update();
   setInterval(update, 1000);

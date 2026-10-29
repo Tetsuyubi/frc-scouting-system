@@ -15,7 +15,9 @@ from django.shortcuts import render, redirect
 from django.db import transaction
 from django.db.models import Count
 from concurrent.futures import ThreadPoolExecutor
-from api.tba import get_teams_list, get_team_events, get_match_videos, get_event_rankings, get_team_avatar
+from api.tba import get_teams_list, get_team_events, get_match_videos, get_event_rankings, get_team_avatar, get_match_schedule
+from django.core.cache import cache
+from api import tba
 from helpers import login_required, role_required, per_match_values, match_count
 from teams.models import Teams, Team_Match_Data, Human_Player_Match
 from .forms import NewHumanScoutingData
@@ -27,6 +29,96 @@ cloudinary.config(
     api_key=os.environ.get("CLOUD_API_KEY"),
     api_secret=os.environ.get("CLOUD_API_SECRET"),
     secure=True)
+
+
+OWN_TEAM = 2073
+_LEVEL_ORDER = {'qm': 0, 'ef': 1, 'qf': 2, 'sf': 3, 'f': 4}
+_LEVEL_NAME = {'qm': 'Qual', 'ef': 'Eighths', 'qf': 'Quarters', 'sf': 'Playoff', 'f': 'Final'}
+
+
+def _match_label(m):
+    level = m.get('comp_level', 'qm')
+    if level == 'qm':
+        return f"Qual {m.get('match_number')}"
+    if level == 'sf':
+        return f"Playoff {m.get('set_number')}"
+    return f"{_LEVEL_NAME.get(level, level.upper())} {m.get('match_number')}"
+
+
+def _alliance(m, color):
+    a = (m.get('alliances') or {}).get(color) or {}
+    teams = [int(k[3:]) for k in a.get('team_keys', []) if k.startswith('frc') and k[3:].isdigit()]
+    return {'teams': teams, 'score': a.get('score')}
+
+
+def build_home_hero(comp_code):
+    """Live event snapshot for the landing page: our next match, rank, record
+    and alliance-score trend. Cached briefly so the home page never waits on
+    The Blue Alliance more than once every couple of minutes."""
+    if not comp_code or comp_code == 'testing' or not re.match(r'^[A-Za-z0-9_\-]{1,20}$', comp_code):
+        return None
+    key = f'home_hero:{comp_code}'
+    hit = cache.get(key)
+    if hit is not None:
+        return hit or None
+
+    hero = {'comp': comp_code}
+    try:
+        # Fetch the three TBA endpoints side by side; the calls below then
+        # read them from cache.
+        tba.prefetch([
+            (f'/event/{comp_code}/matches/simple', tba.TTL_LIVE),
+            (f'/event/{comp_code}/rankings', tba.TTL_LIVE),
+            (f'/event/{comp_code}/teams/simple', tba.TTL_TEAMS),
+        ])
+        schedule = get_match_schedule(comp_code)
+        if not isinstance(schedule, list):
+            schedule = []
+        ours = [m for m in schedule if f'frc{OWN_TEAM}' in
+                ((m.get('alliances') or {}).get('red', {}).get('team_keys', []) +
+                 (m.get('alliances') or {}).get('blue', {}).get('team_keys', []))]
+        ours.sort(key=lambda m: (_LEVEL_ORDER.get(m.get('comp_level'), 9), m.get('set_number') or 0, m.get('match_number') or 0))
+
+        wins = losses = ties = 0
+        trend = []
+        next_match = None
+        for m in ours:
+            red, blue = _alliance(m, 'red'), _alliance(m, 'blue')
+            our_color = 'red' if OWN_TEAM in red['teams'] else 'blue'
+            ours_a = red if our_color == 'red' else blue
+            played = ours_a['score'] is not None and ours_a['score'] >= 0
+            if played:
+                winner = m.get('winning_alliance') or ''
+                if winner == our_color:
+                    wins += 1
+                elif winner:
+                    losses += 1
+                else:
+                    ties += 1
+                trend.append({'label': _match_label(m), 'score': ours_a['score'],
+                              'won': winner == our_color})
+            elif next_match is None:
+                next_match = {
+                    'label': _match_label(m),
+                    'time': m.get('predicted_time') or m.get('time'),
+                    'our_color': our_color,
+                    'red': red['teams'],
+                    'blue': blue['teams'],
+                }
+        hero['record'] = {'w': wins, 'l': losses, 't': ties} if (wins or losses or ties) else None
+        hero['trend'] = trend[-12:]
+        hero['next'] = next_match
+        hero['rank'] = get_event_rankings(comp_code).get(OWN_TEAM)
+        hero['ticker'] = sorted(
+            [{'n': t.get('team_number'), 'name': t.get('nickname') or ''}
+             for t in get_teams_list(comp_code) if t.get('team_number')],
+            key=lambda t: t['n'])[:60]
+    except Exception:  # nosec B110 - the landing page must render regardless
+        cache.set(key, {}, 60)
+        return None
+
+    cache.set(key, hero, 120)
+    return hero
 
 
 def home(request):
@@ -61,6 +153,7 @@ def home(request):
     return render(request, 'home.html', {
         'robot_picture': robot_picture,
         'home_stats': home_stats,
+        'hero': build_home_hero(stats_comp),
     })
 
 

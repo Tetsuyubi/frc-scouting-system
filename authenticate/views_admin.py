@@ -102,7 +102,14 @@ def admin_panel(request):
     theme_color = (site_settings.theme_color if site_settings else '#e74c3c')
     logo_url = (site_settings.logo_url if site_settings else '/static/images/logo.png')
 
+    try:
+        from hours_app.seasons import current_season
+        hours_season = current_season()
+    except Exception:
+        hours_season = None
+
     return render(request, 'authenticate/admin.html', {
+        'hours_season': hours_season,
         'users': users,
         'leaderboard': leaderboard,
         'comp_code': comp_code,
@@ -526,3 +533,25 @@ def hours_checkout_all(request):
         return JsonResponse({'status': 'success', 'count': count})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@admin_required
+@require_POST
+def hours_end_season(request):
+    """Close the open hours season: everyone is checked out, totals are saved,
+    and the hours app becomes read-only until a new season starts."""
+    from hours_app.seasons import end_season
+    end_season()
+    return redirect('/admin-panel/#section-hours')
+
+
+@admin_required
+@require_POST
+def hours_start_season(request):
+    """Open a new season. Every member's total starts again from zero; past
+    seasons' records stay in the database."""
+    from hours_app.seasons import start_season
+    name = request.POST.get('name', '').strip()[:60]
+    if name:
+        start_season(name)
+    return redirect('/admin-panel/#section-hours')

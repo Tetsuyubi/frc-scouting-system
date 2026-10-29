@@ -924,6 +924,10 @@ html.inverted {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
             Compare
         </button>
+        <button type="button" id="web-toggle" class="compare-toggle web-toggle" onclick="openWebStats()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 21 7 21 17 12 22 3 17 3 7"/><polygon points="12 7 16.5 9.5 16.5 14.5 12 17 7.5 14.5 7.5 9.5"/></svg>
+            Web stats
+        </button>
     </div>
 
     <!-- Search -->
@@ -1164,6 +1168,29 @@ html.inverted {
     <button type="button" class="compare-clear" onclick="clearCompare()">Clear</button>
 </div>
 
+<!-- Web stats modal: hexagon chart for up to four teams -->
+<div id="web-backdrop" class="cmp-backdrop" hidden onclick="if(event.target===this)closeWebStats()">
+    <div class="cmp-modal web-modal" role="dialog" aria-modal="true" aria-labelledby="web-title">
+        <div class="cmp-head">
+            <div id="web-title" class="cmp-title">Web stats</div>
+            <button type="button" class="cmp-close" onclick="closeWebStats()" aria-label="Close">&#10005;</button>
+        </div>
+        <div class="cmp-body web-body">
+            <form class="web-pick" id="web-pick" autocomplete="off">
+                <label for="web-team-input" class="web-pick-label">Add a team</label>
+                <input id="web-team-input" list="web-team-list" inputmode="numeric" placeholder="Team number" maxlength="6">
+                <datalist id="web-team-list"></datalist>
+                <button type="submit">Add</button>
+                <div class="web-chips" id="web-chips"></div>
+            </form>
+            <div class="web-layout">
+                <div class="web-chart" id="web-chart"></div>
+                <div class="web-side" id="web-side"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Compare Modal -->
 <div id="compare-backdrop" class="cmp-backdrop" hidden onclick="if(event.target===this)closeCompare()">
     <div class="cmp-modal" role="dialog" aria-modal="true" aria-labelledby="cmp-title">
@@ -1248,6 +1275,88 @@ html.inverted {
 @keyframes modalIn {
     from { opacity:0; transform:scale(0.94) translateY(10px); }
     to   { opacity:1; transform:none; }
+}
+
+
+/* ---------- Web stats (hexagon chart) ----------
+   Series colours follow a fixed order by position, validated for colour-blind
+   separation; a single team uses the accent. Text never takes series colour. */
+:root {
+    --web-1: #2a78d6; --web-2: #eb6834; --web-3: #1baf7a; --web-4: #eda100;
+}
+html.inverted {
+    --web-1: #3987e5; --web-2: #d95926; --web-3: #199e70; --web-4: #c98500;
+}
+.web-wrap { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
+.web-svg { width: 100%; max-width: 360px; height: auto; overflow: visible; flex: 0 0 auto; }
+.web-wrap.is-compact .web-svg { max-width: 290px; }
+.web-ring { fill: none; stroke: var(--border); stroke-width: 1; }
+.web-ring.is-outer { stroke: color-mix(in srgb, var(--muted-text) 45%, transparent); }
+.web-spoke { stroke: var(--border); stroke-width: 1; }
+.web-axis-label { font-size: 11px; font-weight: 700; fill: var(--text); }
+.web-axis-sub { font-size: 10px; font-weight: 600; fill: var(--muted-text); }
+.web-shape { stroke-width: 2; stroke-linejoin: round; transition: opacity 0.15s; }
+.web-shape-fill { opacity: 0.16; }
+.web-dot { stroke: var(--bg-elevated); stroke-width: 2; }
+.web-wrap.is-dimming .web-series { opacity: 0.18; }
+.web-wrap.is-dimming .web-series.is-focus { opacity: 1; }
+.web-series { transition: opacity 0.15s; animation: webGrow 0.6s cubic-bezier(0.22,1,0.36,1) both; transform-origin: var(--cx) var(--cy); }
+@keyframes webGrow { from { transform: scale(0.2); opacity: 0; } }
+.web-tip {
+    position: absolute; pointer-events: none; z-index: 5;
+    transform: translate(-50%, calc(-100% - 10px));
+    padding: 0.3rem 0.55rem; border-radius: 8px;
+    background: var(--text); color: var(--bg);
+    font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+}
+.web-tip[hidden] { display: none; }
+.web-legend { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 180px; }
+.web-legend-row {
+    display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center;
+    padding: 6px 8px; border-radius: 9px; border: 1px solid transparent; cursor: default;
+}
+.web-legend-row:hover { border-color: var(--border); background: var(--bg-subtle); }
+.web-swatch { width: 12px; height: 12px; border-radius: 3px; grid-row: span 2; }
+.web-legend-name { font-size: 0.86rem; font-weight: 800; color: var(--text); }
+.web-legend-note { font-size: 0.72rem; color: var(--muted-text); }
+.web-values { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.web-wrap > .web-values { flex: 1 1 220px; width: auto; }
+.web-values th, .web-values td { padding: 5px 8px; border-bottom: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+.web-values th:first-child, .web-values td:first-child { text-align: left; color: var(--muted-text); font-weight: 600; }
+.web-values thead th { font-size: 0.72rem; font-weight: 800; }
+.web-empty { color: var(--muted-text); font-size: 0.85rem; padding: 18px 0; }
+
+.web-modal { width: min(980px, 100%); height: auto; max-height: calc(100dvh - 32px); }
+.web-body { padding-top: 16px; }
+.web-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+.web-pick-label { font-size: 0.74rem; font-weight: 700; color: var(--muted-text); }
+.web-pick input {
+    width: 130px; padding: 0.4rem 0.6rem; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: 0.85rem;
+}
+.web-pick input:focus { outline: none; border-color: var(--accent); }
+.web-pick button[type="submit"] {
+    padding: 0.4rem 0.8rem; border-radius: 9px; border: none;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 0.8rem; cursor: pointer;
+}
+.web-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-left: 4px; }
+.web-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 0.25rem 0.35rem 0.25rem 0.6rem; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--bg-elevated);
+    font-size: 0.8rem; font-weight: 800; color: var(--text);
+}
+.web-chip i { width: 9px; height: 9px; border-radius: 50%; }
+.web-chip button { border: none; background: none; color: var(--muted-text); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 4px; border-radius: 50%; }
+.web-chip button:hover { color: var(--text); background: var(--border); }
+.web-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(260px, 1fr); gap: 24px; align-items: center; }
+.web-layout .web-svg { max-width: 460px; margin: 0 auto; display: block; }
+.web-side .web-legend { margin-bottom: 14px; }
+@media (max-width: 760px) { .web-layout { grid-template-columns: minmax(0, 1fr); } }
+.web-side { min-width: 0; }
+.cmp-web { padding: 12px 4px 4px; }
+@media (max-width: 640px) {
+    .web-svg, .web-wrap.is-compact .web-svg { max-width: 100%; }
 }
 
 /* ---------- Team modal sections ---------- */
@@ -1524,6 +1633,10 @@ html.inverted {
             }
             html += '</div>';
 
+            // ---- Web stats ---------------------------------------------
+            html += '<div class="tm-section">' + sectionTitle('Web stats', 'scaled to the best team at this event')
+                  + '<div class="tm-web" id="tm-web"></div></div>';
+
             // ---- 2. Pit scouting ---------------------------------------
             var pitEntries = Object.entries(data.pit_data || {}).filter(function (pair) {
                 var v = pair[1];
@@ -1587,6 +1700,7 @@ html.inverted {
             content.innerHTML = html;
             loading.style.display = 'none';
             content.style.display = 'block';
+            if (window.WebStats) { window.WebStats.render(document.getElementById('tm-web'), [teamNumber], { compact: true }); }
         })
         .catch(function () {
             loading.textContent = 'Could not load team data.';
@@ -2019,6 +2133,10 @@ window.buildStatChips = function (info) {
                 '</div>';
             }).join('') + '</div>';
 
+            // ---- Web stats: every compared team on one hexagon ----
+            html += '<details class="cmp-section" open><summary>Web stats <span class="cmp-count">scaled to the best team at this event</span></summary>'
+                  + '<div class="cmp-web" id="cmp-web"></div></details>';
+
             // ---- Overview ----
             html += section('Overview',
                 row(n, 'Event rank',      teams.map(function (t) { return infoFor(t).rank; }), 'low') +
@@ -2056,6 +2174,7 @@ window.buildStatChips = function (info) {
             }).join(''), keys.length + ' fields', keys.length <= 12);
 
             body.innerHTML = html;
+            if (window.WebStats) { window.WebStats.render(document.getElementById('cmp-web'), teams); }
         });
     };
 
@@ -2072,6 +2191,212 @@ window.buildStatChips = function (info) {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', renderTray);
     } else { renderTray(); }
+})();
+</script>
+
+<script>
+/* =========================================================================
+   Web stats: a hexagon ("radar") chart of six per-team averages.
+   One endpoint feeds every view - the team modal, the compare modal and the
+   standalone Web stats dialog - so the shapes always agree.
+   ========================================================================= */
+(function () {
+    var MAX_TEAMS = 4;
+    var cache = null;
+
+    function comp() {
+        var m = window.location.search.match(/[?&]comp=([^&]+)/);
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+    function load() {
+        if (cache) return cache;
+        cache = fetch('/api/web_stats/?comp=' + encodeURIComponent(comp()) + '&quantifier=Quals', {
+            credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+        return cache;
+    }
+    function esc(v) {
+        return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function fmt(v) { return (Math.round(v * 10) / 10).toString(); }
+    function colorFor(i, single) { return single ? 'var(--accent)' : 'var(--web-' + (i + 1) + ')'; }
+
+    function render(el, teamNumbers, opts) {
+        if (!el) return;
+        opts = opts || {};
+        el.innerHTML = '<div class="web-empty">Loading&hellip;</div>';
+        load().then(function (data) {
+            if (!data || !data.axes) { el.innerHTML = '<div class="web-empty">Web stats are unavailable right now.</div>'; return; }
+            var axes = data.axes;
+            var series = teamNumbers.slice(0, MAX_TEAMS).map(function (n) {
+                return { team: String(n), stats: data.teams[String(n)] };
+            });
+            var withData = series.filter(function (s) { return s.stats; });
+            if (!withData.length) {
+                el.innerHTML = '<div class="web-empty">No scouted matches yet for ' + series.map(function (s) { return esc(s.team); }).join(', ') + '.</div>';
+                return;
+            }
+            var single = series.length === 1;
+
+            // Geometry: six axes, the first pointing straight up.
+            var W = 360, H = 320, cx = W / 2, cy = H / 2 + 4, R = 112;
+            function pt(i, frac) {
+                var a = -Math.PI / 2 + i * 2 * Math.PI / axes.length;
+                return [cx + Math.cos(a) * R * frac, cy + Math.sin(a) * R * frac];
+            }
+            function frac(axis, v) { return Math.max(0, Math.min(1, (v || 0) / (axis.max || 1))); }
+
+            var svg = '<svg class="web-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Web stats for team' + (single ? ' ' : 's ') + esc(series.map(function (s) { return s.team; }).join(', ')) + '">';
+            // Rings at 20% steps, outer ring stronger.
+            for (var k = 1; k <= 5; k++) {
+                var ring = axes.map(function (_, i) { return pt(i, k / 5).map(function (n) { return n.toFixed(1); }).join(','); }).join(' ');
+                svg += '<polygon class="web-ring' + (k === 5 ? ' is-outer' : '') + '" points="' + ring + '"/>';
+            }
+            axes.forEach(function (axis, i) {
+                var e = pt(i, 1);
+                svg += '<line class="web-spoke" x1="' + cx + '" y1="' + cy + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) + '"/>';
+                var l = pt(i, 1.2);
+                var anchor = Math.abs(l[0] - cx) < 4 ? 'middle' : (l[0] > cx ? 'start' : 'end');
+                var dy = l[1] < cy - R * 0.9 ? -4 : (l[1] > cy + R * 0.9 ? 12 : 4);
+                svg += '<text class="web-axis-label" x="' + l[0].toFixed(1) + '" y="' + (l[1] + dy).toFixed(1) + '" text-anchor="' + anchor + '">' + esc(axis.label) + '</text>';
+                // Single team: its value sits under the label. Otherwise the scale.
+                var sub = single && series[0].stats
+                    ? fmt(series[0].stats.values[axis.key]) + (axis.rating ? ' / 5' : '')
+                    : (axis.rating ? 'of 5' : 'best ' + fmt(axis.max));
+                svg += '<text class="web-axis-sub" x="' + l[0].toFixed(1) + '" y="' + (l[1] + dy + 13).toFixed(1) + '" text-anchor="' + anchor + '">' + esc(sub) + '</text>';
+            });
+            series.forEach(function (s, idx) {
+                if (!s.stats) return;
+                var col = colorFor(idx, single);
+                var pts = axes.map(function (axis, i) { return pt(i, frac(axis, s.stats.values[axis.key])); });
+                var poly = pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+                svg += '<g class="web-series" data-series="' + idx + '" style="--cx:' + cx + 'px;--cy:' + cy + 'px;animation-delay:' + (idx * 90) + 'ms">'
+                     + '<polygon class="web-shape web-shape-fill" points="' + poly + '" fill="' + col + '"/>'
+                     + '<polygon class="web-shape" points="' + poly + '" fill="none" stroke="' + col + '"/>'
+                     + pts.map(function (p) { return '<circle class="web-dot" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="4.5" fill="' + col + '"/>'; }).join('')
+                     + '</g>';
+            });
+            svg += '</svg>';
+
+            // Legend (two or more teams) doubles as a focus control; one team
+            // gets a plain value table instead, which is also the table view.
+            var side = '';
+            if (!single) {
+                side = '<div class="web-legend">' + series.map(function (s, idx) {
+                    var info = (window.TEAM_INFO || {})[s.team] || {};
+                    return '<div class="web-legend-row" data-series="' + idx + '">'
+                         + '<span class="web-swatch" style="background:' + colorFor(idx, false) + '"></span>'
+                         + '<span class="web-legend-name">' + esc(s.team) + '</span>'
+                         + '<span class="web-legend-note">' + (s.stats ? (info.nickname ? esc(info.nickname) + ' &middot; ' : '') + s.stats.matches + ' matches' : 'no scouted matches') + '</span>'
+                         + '</div>';
+                }).join('') + '</div>';
+            }
+            var table = '<table class="web-values"><thead><tr><th></th>' + series.map(function (s) { return '<th>' + esc(s.team) + '</th>'; }).join('') + '</tr></thead><tbody>'
+                + axes.map(function (axis) {
+                    return '<tr><td>' + esc(axis.label) + '</td>' + series.map(function (s) {
+                        return '<td>' + (s.stats ? fmt(s.stats.values[axis.key]) : '&mdash;') + '</td>';
+                    }).join('') + '</tr>';
+                }).join('') + '</tbody></table>';
+
+            var target = opts.side ? document.getElementById(opts.side) : null;
+            el.innerHTML = '<div class="web-wrap' + (opts.compact ? ' is-compact' : '') + '">' + svg
+                + (target ? '' : side + (single ? table : ''))
+                + '<div class="web-tip" hidden></div></div>';
+            if (target) { target.innerHTML = side + table; }
+
+            // Hover: nearest vertex across all teams, within reach.
+            var wrap = el.querySelector('.web-wrap');
+            var svgEl = el.querySelector('.web-svg');
+            var tip = el.querySelector('.web-tip');
+            var verts = [];
+            series.forEach(function (s, idx) {
+                if (!s.stats) return;
+                axes.forEach(function (axis, i) {
+                    var p = pt(i, frac(axis, s.stats.values[axis.key]));
+                    verts.push({ x: p[0], y: p[1], idx: idx, text: 'Team ' + s.team + ' · ' + axis.label + ' ' + fmt(s.stats.values[axis.key]) + (axis.rating ? ' / 5' : '') });
+                });
+            });
+            function focus(idx) {
+                wrap.classList.toggle('is-dimming', idx != null && !single);
+                wrap.querySelectorAll('.web-series').forEach(function (g) { g.classList.toggle('is-focus', +g.dataset.series === idx); });
+            }
+            svgEl.addEventListener('pointermove', function (ev) {
+                var r = svgEl.getBoundingClientRect(), sx = W / r.width;
+                var x = (ev.clientX - r.left) * sx, y = (ev.clientY - r.top) * sx;
+                var best = null, bd = 22 * 22;
+                verts.forEach(function (v) { var d = (v.x - x) * (v.x - x) + (v.y - y) * (v.y - y); if (d < bd) { bd = d; best = v; } });
+                if (!best) { tip.hidden = true; focus(null); return; }
+                var wr = wrap.getBoundingClientRect();
+                tip.hidden = false;
+                tip.textContent = best.text;
+                tip.style.left = (r.left - wr.left + best.x / sx) + 'px';
+                tip.style.top = (r.top - wr.top + best.y / sx) + 'px';
+                focus(best.idx);
+            });
+            svgEl.addEventListener('pointerleave', function () { tip.hidden = true; focus(null); });
+            (target || el).querySelectorAll('.web-legend-row').forEach(function (row) {
+                row.addEventListener('mouseenter', function () { focus(+row.dataset.series); });
+                row.addEventListener('mouseleave', function () { focus(null); });
+            });
+        });
+    }
+
+    window.WebStats = { render: render };
+
+    /* ---- Standalone dialog ---- */
+    var picked = [];
+    function drawDialog() {
+        var chips = document.getElementById('web-chips');
+        chips.innerHTML = picked.map(function (n, i) {
+            return '<span class="web-chip"><i style="background:' + colorFor(i, picked.length === 1) + '"></i>' + esc(n)
+                 + '<button type="button" data-team="' + esc(n) + '" aria-label="Remove team ' + esc(n) + '">&times;</button></span>';
+        }).join('');
+        chips.querySelectorAll('button').forEach(function (b) {
+            b.addEventListener('click', function () { picked = picked.filter(function (t) { return t !== b.dataset.team; }); drawDialog(); });
+        });
+        if (!picked.length) {
+            document.getElementById('web-chart').innerHTML = '<div class="web-empty">Add up to ' + MAX_TEAMS + ' teams to compare their webs.</div>';
+            document.getElementById('web-side').innerHTML = '';
+            return;
+        }
+        render(document.getElementById('web-chart'), picked, { side: 'web-side' });
+    }
+    window.openWebStats = function () {
+        var list = document.getElementById('web-team-list');
+        list.innerHTML = Object.keys(window.TEAM_INFO || {}).sort(function (a, b) { return a - b; }).map(function (n) {
+            return '<option value="' + esc(n) + '">' + esc((window.TEAM_INFO[n] || {}).nickname || '') + '</option>';
+        }).join('');
+        // Start from the teams picked in compare mode, else the first-pick column.
+        if (!picked.length) {
+            var fromCompare = [].slice.call(document.querySelectorAll('.picklist_teams.cmp-picked')).map(function (li) { return String(li.dataset.team || li.id); });
+            var fromFirst = [].slice.call(document.querySelectorAll('#first_pick .picklist_teams')).map(function (li) { return String(li.dataset.team || li.id); });
+            picked = (fromCompare.length ? fromCompare : fromFirst).filter(Boolean).slice(0, 3);
+        }
+        document.getElementById('web-backdrop').hidden = false;
+        drawDialog();
+        setTimeout(function () { document.getElementById('web-team-input').focus(); }, 50);
+    };
+    window.closeWebStats = function () { document.getElementById('web-backdrop').hidden = true; };
+    document.addEventListener('DOMContentLoaded', function () {
+        var form = document.getElementById('web-pick');
+        if (!form) return;
+        form.addEventListener('submit', function (ev) {
+            ev.preventDefault();
+            var input = document.getElementById('web-team-input');
+            var n = input.value.trim();
+            if (/^\d{1,5}$/.test(n) && picked.indexOf(n) === -1 && picked.length < MAX_TEAMS) { picked.push(n); }
+            input.value = '';
+            drawDialog();
+        });
+        // Same reparenting as the other dialogs, so the transformed page body
+        // cannot clip it.
+        var bd = document.getElementById('web-backdrop');
+        if (bd && bd.parentNode !== document.body) document.body.appendChild(bd);
+    });
+    document.addEventListener('keydown', function (ev) {
+        var b = document.getElementById('web-backdrop');
+        if (ev.key === 'Escape' && b && !b.hidden) closeWebStats();
+    });
 })();
 </script>
 {% endblock %}

@@ -175,6 +175,58 @@ class Badge(models.Model):
         return BADGE_META.get(self.badge_type, {}).get('svg', '')
 
 
+class HoursSeason(models.Model):
+    """A build season. Hours are only tracked while the latest season is open;
+    between seasons the app is read-only and shows the season that just ended.
+    Sessions belong to a season by when they started, so nothing is deleted
+    when a new season begins - the old records simply fall outside its window."""
+    name = models.CharField(max_length=60)
+    started_at = models.DateTimeField()
+    ended_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def is_open(self):
+        return self.ended_at is None
+
+
+class HoursSeasonTotal(models.Model):
+    """Final hours per person, saved when a season ends, so a past season's
+    totals survive the next season's reset."""
+    season = models.ForeignKey(HoursSeason, on_delete=models.CASCADE, related_name='totals')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='season_totals')
+    total_hours = models.FloatField(default=0.0)
+
+    class Meta:
+        unique_together = ('season', 'user')
+
+
+class HoursAdjustment(models.Model):
+    """Hours a mentor or lead adds (or removes, with a negative value) for a
+    member, e.g. for work done away from the check-in screen."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hours_adjustments')
+    season = models.ForeignKey(HoursSeason, on_delete=models.CASCADE, related_name='adjustments')
+    hours = models.FloatField()
+    work_date = models.DateField()
+    reason = models.CharField(max_length=255)
+    added_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='hours_adjustments_made'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-work_date', '-created_at']
+
+    def __str__(self):
+        return f"{self.user.username}: {self.hours:+.2f} h ({self.work_date})"
+
+
 class SeasonRank(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='rank')
     total_hours = models.FloatField(default=0.0)

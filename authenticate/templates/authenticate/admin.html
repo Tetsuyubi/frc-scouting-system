@@ -833,6 +833,19 @@
         html.inverted ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
         html.inverted ::-webkit-scrollbar-track, html.inverted ::-webkit-scrollbar-corner { background: transparent; }
 
+        .season-box {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+            padding: 12px 14px; margin-bottom: 18px;
+            border: 1px solid var(--border); border-radius: var(--radius-md);
+            background: var(--bg-subtle);
+        }
+        .season-box.is-open { border-color: color-mix(in srgb, #22c55e 40%, var(--border)); }
+        .season-box-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text); }
+        .season-box-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-text); }
+        .season-box-dates { font-size: 12px; color: var(--muted-text); }
+        .season-box-start { display: flex; gap: 8px; margin: 0; flex-wrap: wrap; }
+        .season-box-start .form-input { width: 220px; }
+
         .theme-toggle-btn .icon-sun { display: none; }
         html.inverted .theme-toggle-btn .icon-sun { display: inline; }
         html.inverted .theme-toggle-btn .icon-moon { display: none; }
@@ -1043,6 +1056,36 @@
                 </div>
 
                 <div class="card-body">
+                    <!-- Season: hours are only tracked while a season is open. -->
+                    <div class="season-box{% if hours_season and hours_season.is_open %} is-open{% endif %}">
+                        <div class="season-box-info">
+                            <span class="season-box-label">Season</span>
+                            {% if hours_season %}
+                                <strong>{{ hours_season.name }}</strong>
+                                <span class="badge {% if hours_season.is_open %}badge-enabled{% else %}badge-disabled{% endif %}">{% if hours_season.is_open %}Open{% else %}Ended{% endif %}</span>
+                                <span class="season-box-dates">
+                                    {{ hours_season.started_at|date:"M j, Y" }} &ndash; {% if hours_season.ended_at %}{{ hours_season.ended_at|date:"M j, Y" }}{% else %}now{% endif %}
+                                </span>
+                            {% else %}
+                                <strong>No season set up</strong>
+                            {% endif %}
+                        </div>
+                        {% if hours_season and hours_season.is_open %}
+                        <form method="POST" action="/admin-panel/hours/season/end/" style="margin:0;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger-ghost btn-sm"
+                                    onclick="return confirm('End {{ hours_season.name|escapejs }}? Everyone is checked out and the hours app becomes read-only until a new season starts.')">End season</button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="/admin-panel/hours/season/start/" class="season-box-start">
+                            {% csrf_token %}
+                            <input class="form-input" type="text" name="name" required maxlength="60" placeholder="e.g. 2026–2027 Season">
+                            <button type="submit" class="btn btn-primary btn-sm"
+                                    onclick="return confirm('Start a new season? Everyone\'s hours reset to zero. Past seasons stay saved.')">Start new season</button>
+                        </form>
+                        {% endif %}
+                    </div>
+
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
                         <span style="font-size:13px;font-weight:700;color:var(--text);">Currently Checked In</span>
                         <form method="POST" action="/admin-panel/hours/checkout-all/" id="checkout-all-form" style="display:inline;">
