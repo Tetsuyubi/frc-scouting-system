@@ -13,24 +13,6 @@
     padding: 1.25rem 0.5rem;
 }
 
-.picklist-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-}
-
-.picklist-header h2 {
-    margin: 0;
-    font-family: 'Inter', system-ui, sans-serif;
-    font-weight: 800;
-    color: var(--text);
-    font-size: 1.5rem;
-    letter-spacing: -0.03em;
-}
-
 /* =========================
    Search Bar
    ========================= */
@@ -549,6 +531,9 @@ body.is-dragging .lists:not(.drag-over) { opacity: 0.85; }
     color: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer;
 }
 .compare-toggle.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* Compare and Web stats travel as one group, pushed to the right together. */
+.picklist-actions { display: flex; gap: 0.4rem; margin-left: auto; }
+.picklist-actions .compare-toggle { margin-left: 0; }
 
 /* In compare mode the whole card is a selection target, so suppress the
    grab cursor that would otherwise promise a drag. */
@@ -901,7 +886,6 @@ html.inverted {
     .toolbar-right { justify-content: flex-end; }
     .toolbar-right .sort-label { display: none; }
     .toolbar-right .pool-sort { max-width: 100%; }
-    .picklist-header h2 { font-size: 1.45rem; margin-bottom: 0; }
     .col-header { position: sticky; top: 0; z-index: 2; }
 
     /* Fingertip-sized star / strike / select targets, side by side to save height. */
@@ -916,10 +900,17 @@ html.inverted {
 {% block Content %}
 <div class="picklist-page">
 
-    <!-- Header -->
-    <div class="picklist-header">
-        <h2>Picklist</h2>
-        <span class="autosave-badge" id="autosave-badge">Auto-save on</span>
+    <!-- Draft room: who we would pick right now, and how the field looks -->
+    <header class="draft-room">
+        <div class="draft-hex" aria-hidden="true"></div>
+        <div class="draft-top">
+            <div class="draft-heading">
+                <div class="draft-kicker">Alliance selection{% if comp_code %} &middot; {{ comp_code|upper }}{% endif %}</div>
+                <h2 class="draft-title">Draft board</h2>
+            </div>
+            <div class="draft-top-right">
+                <span class="autosave-badge" id="autosave-badge">Auto-save on</span>
+                <div class="picklist-actions">
         <button type="button" id="compare-toggle" class="compare-toggle" onclick="toggleCompareMode()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
             Compare
@@ -928,7 +919,26 @@ html.inverted {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 21 7 21 17 12 22 3 17 3 7"/><polygon points="12 7 16.5 9.5 16.5 14.5 12 17 7.5 14.5 7.5 9.5"/></svg>
             Web stats
         </button>
-    </div>
+        </div>
+            </div>
+        </div>
+
+        <div class="draft-bottom">
+            <!-- Each pick column is a ranked queue: when a team is taken by
+                 another alliance, the next one in line becomes our pick. -->
+            <div class="draft-alliance draft-queues" aria-label="Best available team in each pick round">
+                <div class="draft-plate" data-col="1st_pick" data-round="1st pick"></div>
+                <div class="draft-plate" data-col="2nd_pick" data-round="2nd pick"></div>
+                <div class="draft-plate" data-col="3rd_pick" data-round="3rd pick"></div>
+                <div class="draft-plate" data-col="4th_pick" data-round="4th pick"></div>
+            </div>
+            <dl class="draft-meter">
+                <div><dt>Available</dt><dd id="draft-available">&ndash;</dd></div>
+                <div><dt>Taken</dt><dd id="draft-taken">&ndash;</dd></div>
+                <div><dt>Starred</dt><dd id="draft-starred">&ndash;</dd></div>
+            </dl>
+        </div>
+    </header>
 
     <!-- Search -->
     <div class="picklist-search-row">
@@ -994,7 +1004,7 @@ html.inverted {
         <!-- No Pick (unassigned pool) -->
         <div class="picklist-col">
             <div class="col-header col-no-pick">
-                No Pick
+                <span class="col-ord col-ord-pool" aria-hidden="true">&#9675;</span><span class="col-name">No pick</span>
                 <span class="col-count" id="count-no_pick">0</span>
                 <select class="pool-sort" id="pool-sort" onchange="sortPool(this.value)" title="Sort the unassigned pool">
                     <option value="number">Team #</option>
@@ -1036,7 +1046,7 @@ html.inverted {
         <!-- First Pick -->
         <div class="picklist-col">
             <div class="col-header col-first">
-                First Pick
+                <span class="col-ord">1st</span><span class="col-name">First pick</span>
                 <span class="col-count" id="count-1st_pick">0</span>
             </div>
             <ol class="lists" id="1st_pick" ondrop="onDrop(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)">
@@ -1059,7 +1069,7 @@ html.inverted {
         <!-- Second Pick -->
         <div class="picklist-col">
             <div class="col-header col-second">
-                Second Pick
+                <span class="col-ord">2nd</span><span class="col-name">Second pick</span>
                 <span class="col-count" id="count-2nd_pick">0</span>
             </div>
             <ol class="lists" id="2nd_pick" ondrop="onDrop(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)">
@@ -1082,7 +1092,7 @@ html.inverted {
         <!-- Third Pick (hidden until switched on in the toolbar, or when it has teams) -->
         <div class="picklist-col" id="colwrap-3rd_pick" data-optional="3rd_pick" hidden>
             <div class="col-header col-third">
-                Third Pick
+                <span class="col-ord">3rd</span><span class="col-name">Third pick</span>
                 <span class="col-count" id="count-3rd_pick">0</span>
             </div>
             <ol class="lists" id="3rd_pick" ondrop="onDrop(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)">
@@ -1105,7 +1115,7 @@ html.inverted {
         <!-- Fourth Pick (hidden until switched on in the toolbar, or when it has teams) -->
         <div class="picklist-col" id="colwrap-4th_pick" data-optional="4th_pick" hidden>
             <div class="col-header col-fourth">
-                Fourth Pick
+                <span class="col-ord">4th</span><span class="col-name">Fourth pick</span>
                 <span class="col-count" id="count-4th_pick">0</span>
             </div>
             <ol class="lists" id="4th_pick" ondrop="onDrop(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)">
@@ -1128,7 +1138,7 @@ html.inverted {
         <!-- Do Not Pick -->
         <div class="picklist-col">
             <div class="col-header col-dnp">
-                Do Not Pick
+                <span class="col-ord col-ord-pool" aria-hidden="true">&times;</span><span class="col-name">Do not pick</span>
                 <span class="col-count" id="count-dnp">0</span>
             </div>
             <ol class="lists" id="dnp" ondrop="onDrop(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)">
@@ -1277,6 +1287,176 @@ html.inverted {
     to   { opacity:1; transform:none; }
 }
 
+
+
+/* =========================================================================
+   DRAFT ROOM
+   The picklist is a draft board: a banner with the alliance we would pick
+   right now, numbered draft order down each pick column, and a TAKEN stamp
+   on teams other alliances have already picked.
+   ========================================================================= */
+.draft-room {
+    position: relative; overflow: hidden; isolation: isolate;
+    margin-bottom: 1rem; padding: 1.1rem 1.25rem 1.2rem;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background:
+        linear-gradient(115deg, color-mix(in srgb, var(--accent) 13%, transparent) 0%, transparent 42%),
+        var(--bg-elevated);
+}
+/* Honeycomb texture, the same hexagon as the web stats chart. */
+.draft-hex {
+    position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='48' viewBox='0 0 28 48'%3E%3Cpath d='M14 0 28 8v16L14 32 0 24V8z M14 32v16' fill='none' stroke='%23E63946' stroke-opacity='0.16' stroke-width='1'/%3E%3C/svg%3E");
+    background-size: 28px 48px;
+    -webkit-mask-image: linear-gradient(100deg, transparent 30%, #000 75%);
+            mask-image: linear-gradient(100deg, transparent 30%, #000 75%);
+}
+.draft-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.draft-kicker { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.draft-title { margin: 0.15rem 0 0; font-size: 1.85rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1; color: var(--text); }
+.draft-top-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.draft-top-right .picklist-actions { margin-left: 0; }
+
+.draft-bottom { display: flex; align-items: stretch; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+.draft-alliance { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; min-width: 0; }
+.draft-plate {
+    position: relative;
+    display: flex; flex-direction: column; justify-content: center; gap: 0.35rem;
+    min-width: 230px; min-height: 84px; padding: 0.75rem 0.75rem 0.55rem;
+    border-radius: 12px;
+    border: 1.5px dashed color-mix(in srgb, var(--muted-text) 45%, transparent);
+    background: color-mix(in srgb, var(--bg) 60%, transparent);
+    transition: border-color 0.2s, background 0.2s;
+}
+.draft-plate.is-filled {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    background: var(--bg-elevated);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+.plate-main { display: flex; align-items: center; gap: 0.5rem; }
+.plate-left {
+    margin-left: auto; padding: 0.15rem 0.5rem; border-radius: 999px; white-space: nowrap;
+    font-size: 0.66rem; font-weight: 700; color: var(--muted-text);
+    background: color-mix(in srgb, var(--muted-text) 12%, transparent);
+}
+.plate-next { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; font-size: 0.72rem; color: var(--muted-text); }
+.plate-next em { font-style: normal; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.plate-next i { font-style: normal; opacity: 0.6; }
+.draft-plate.just-changed { animation: plateIn 0.45s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes plateIn { from { transform: scale(0.92); } }
+.plate-role {
+    position: absolute; top: -8px; left: 10px;
+    padding: 0 6px; border-radius: 6px;
+    font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted-text); background: var(--bg-elevated);
+}
+.draft-plate.is-filled .plate-role { color: var(--accent); }
+.plate-logo { width: 34px; height: 34px; border-radius: 50%; object-fit: contain; flex-shrink: 0; background: var(--bg); }
+.plate-logo.is-blank { display: inline-block; background: var(--border); }
+.plate-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.plate-text b { font-size: 1rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+.plate-text small { font-size: 0.7rem; color: var(--muted-text); max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plate-open { font-size: 0.78rem; font-weight: 600; color: var(--muted-text); padding-left: 0.3rem; }
+.draft-plate[hidden] { display: none; }
+.draft-queues { gap: 0.75rem; align-items: stretch; padding-top: 0.5rem; }
+
+.draft-meter { display: flex; gap: 0; margin: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg-elevated); align-self: center; }
+.draft-meter > div { padding: 0.45rem 0.9rem; border-left: 1px solid var(--border); text-align: center; }
+.draft-meter > div:first-child { border-left: none; }
+.draft-meter dt { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-text); }
+.draft-meter dd { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ---- Column headers: a tab with a big ordinal and a colour bar that steps
+   down from first pick to fourth. ---- */
+.col-header {
+    position: relative;
+    display: flex; align-items: center; gap: 0.45rem;
+    padding: 0.55rem 0.6rem 0.5rem; border-radius: 10px;
+    border-left-width: 1px !important;
+    overflow: hidden;
+    color: var(--text) !important;
+    text-transform: none; letter-spacing: 0;
+}
+.col-header::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    background: var(--col-bar, var(--border));
+}
+.col-header.col-first  { --col-bar: var(--accent); }
+.col-header.col-second { --col-bar: color-mix(in srgb, var(--accent) 72%, var(--bg-elevated)); }
+.col-header.col-third  { --col-bar: color-mix(in srgb, var(--accent) 48%, var(--bg-elevated)); }
+.col-header.col-fourth { --col-bar: color-mix(in srgb, var(--accent) 30%, var(--bg-elevated)); }
+.col-header.col-dnp    { --col-bar: var(--muted-text); }
+.col-ord {
+    font-size: 1.15rem; font-weight: 900; letter-spacing: -0.04em; line-height: 1;
+    color: color-mix(in srgb, var(--col-bar, var(--muted-text)) 85%, var(--text));
+}
+.col-ord-pool { font-size: 0.95rem; color: var(--muted-text); }
+.col-name { font-size: 0.74rem; font-weight: 700; color: var(--muted-text); text-transform: uppercase; letter-spacing: 0.05em; }
+.col-header .col-count { margin-left: auto; }
+.col-header .pool-sort { margin-left: 0.3rem; }
+
+/* ---- Draft order: a numbered rail down the left of every card in a pick
+   column. CSS counters renumber themselves as cards are dragged. ---- */
+[id="1st_pick"], [id="2nd_pick"], [id="3rd_pick"], [id="4th_pick"] { counter-reset: draft; }
+[id="1st_pick"] > .picklist_teams, [id="2nd_pick"] > .picklist_teams,
+[id="3rd_pick"] > .picklist_teams, [id="4th_pick"] > .picklist_teams {
+    counter-increment: draft;
+    padding-left: 38px;
+}
+[id="1st_pick"] > .picklist_teams::before, [id="2nd_pick"] > .picklist_teams::before,
+[id="3rd_pick"] > .picklist_teams::before, [id="4th_pick"] > .picklist_teams::before {
+    content: counter(draft, decimal-leading-zero);
+    position: absolute; left: 0; top: 0; bottom: 0; width: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 9px 0 0 9px;
+    font-size: 0.74rem; font-weight: 900; font-variant-numeric: tabular-nums;
+    color: var(--muted-text);
+    background: color-mix(in srgb, var(--muted-text) 9%, transparent);
+    border-right: 1px solid var(--border);
+}
+/* The top three of first pick are the ones that matter most on the day. */
+[id="1st_pick"] > .picklist_teams:nth-child(-n+3)::before {
+    color: #fff; background: var(--accent); border-right-color: var(--accent);
+}
+
+/* ---- Taken: stays on the board, stamped, so the order is still readable. ---- */
+.picklist_teams.is-struck { opacity: 1; }
+.picklist_teams.is-struck .team-card-inner { opacity: 0.45; }
+.picklist_teams.is-struck::after {
+    content: 'Taken';
+    position: absolute; right: 72px; top: 50%;
+    transform: translateY(-50%) rotate(-10deg);
+    padding: 1px 7px; border-radius: 4px;
+    border: 2px solid var(--pl-strike); color: var(--pl-strike);
+    font-size: 0.62rem; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase;
+    background: color-mix(in srgb, var(--bg-elevated) 80%, transparent);
+    pointer-events: none;
+}
+
+/* ---- Empty pick columns invite a drop instead of looking broken. ---- */
+.lists.is-empty { position: relative; min-height: 130px; border-style: dashed; }
+.lists.is-empty::after {
+    content: 'Drag teams here';
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.78rem; font-weight: 600; color: var(--muted-text);
+    pointer-events: none;
+}
+
+@media (max-width: 640px) {
+    .draft-room { padding: 0.9rem; border-radius: 16px; }
+    .draft-title { font-size: 1.45rem; }
+    .draft-alliance {
+        flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+        margin: 0 -0.9rem; padding: 0.6rem 0.9rem 0.2rem; width: calc(100% + 1.8rem);
+    }
+    .draft-alliance::-webkit-scrollbar { display: none; }
+    .draft-plate { min-width: 230px; flex-shrink: 0; }
+    .draft-meter { width: 100%; }
+    .draft-meter > div { flex: 1; }
+}
 
 /* ---------- Web stats (hexagon chart) ----------
    Series colours follow a fixed order by position, validated for colour-blind
@@ -2369,7 +2549,7 @@ window.buildStatChips = function (info) {
         // Start from the teams picked in compare mode, else the first-pick column.
         if (!picked.length) {
             var fromCompare = [].slice.call(document.querySelectorAll('.picklist_teams.cmp-picked')).map(function (li) { return String(li.dataset.team || li.id); });
-            var fromFirst = [].slice.call(document.querySelectorAll('#first_pick .picklist_teams')).map(function (li) { return String(li.dataset.team || li.id); });
+            var fromFirst = [].slice.call(document.querySelectorAll('[id="1st_pick"] > .picklist_teams')).map(function (li) { return String(li.dataset.team || li.id); });
             picked = (fromCompare.length ? fromCompare : fromFirst).filter(Boolean).slice(0, 3);
         }
         document.getElementById('web-backdrop').hidden = false;
@@ -2397,6 +2577,104 @@ window.buildStatChips = function (info) {
         var b = document.getElementById('web-backdrop');
         if (ev.key === 'Escape' && b && !b.hidden) closeWebStats();
     });
+})();
+</script>
+
+<script>
+/* =========================================================================
+   Draft room: keeps the alliance plates and the counters in step with the
+   board. Watches the board itself, so drags, undo and the 5-second server
+   refresh all update it without hooking into picklist.js.
+   ========================================================================= */
+(function () {
+    var PICKS = ['1st_pick', '2nd_pick', '3rd_pick', '4th_pick'];
+    var last = {};
+
+    function esc(v) {
+        return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function cards(list) {
+        return list ? [].slice.call(list.querySelectorAll(':scope > .picklist_teams')) : [];
+    }
+
+    function update() {
+        // Each pick column is a ranked queue: the first team not yet taken is our pick for that round, the rest are backups.
+        PICKS.forEach(function (id) {
+            var plate = document.querySelector('.draft-plate[data-col="' + id + '"]');
+            if (!plate) return;
+            var wrap = document.getElementById('colwrap-' + id);
+            var hidden = !!(wrap && wrap.hidden);
+            plate.hidden = hidden;
+            if (hidden) return;
+
+            var all = cards(document.getElementById(id));
+            var open = all.filter(function (li) { return !li.classList.contains('is-struck'); });
+            var queue = open.map(function (li) { return String(li.dataset.team || li.id); });
+            var key = queue.join(',') + '|' + all.length;
+            if (last[id] === key) return;
+            var changedTop = (last[id] || '').split(',')[0] !== (queue[0] || '');
+            last[id] = key;
+
+            var head = '<span class="plate-role">' + esc(plate.dataset.round) + ' &middot; best available</span>';
+            if (!queue.length) {
+                plate.classList.remove('is-filled');
+                plate.innerHTML = head + '<span class="plate-open">'
+                    + (all.length ? 'Every team in this list is taken' : 'No teams ranked yet') + '</span>';
+                return;
+            }
+            var info = (window.TEAM_INFO || {})[queue[0]] || {};
+            var backups = queue.slice(1, 4);
+            plate.classList.add('is-filled');
+            plate.innerHTML = head
+                + '<div class="plate-main">'
+                +   (info.logo_url ? '<img class="plate-logo" src="' + esc(info.logo_url) + '" alt="">' : '<span class="plate-logo is-blank"></span>')
+                +   '<span class="plate-text"><b>' + esc(queue[0]) + '</b><small>' + esc(info.nickname || '') + '</small></span>'
+                +   '<span class="plate-left" title="Teams in this list not yet taken">' + queue.length + ' of ' + all.length + ' left</span>'
+                + '</div>'
+                + '<div class="plate-next">'
+                +   (backups.length
+                        ? '<span>If taken:</span>' + backups.map(function (t) { return '<em>' + esc(t) + '</em>'; }).join('<i aria-hidden="true">&rsaquo;</i>')
+                          + (queue.length > 4 ? '<span>+' + (queue.length - 4) + '</span>' : '')
+                        : '<span>No backups ranked below</span>')
+                + '</div>';
+            if (changedTop) {
+                plate.classList.remove('just-changed');
+                void plate.offsetWidth;
+                plate.classList.add('just-changed');
+            }
+        });
+
+        var board = document.getElementById('picklist-board');
+        if (!board) return;
+        var all = [].slice.call(board.querySelectorAll('.picklist_teams'));
+        var pool = cards(document.getElementById('no_pick'));
+        document.getElementById('draft-available').textContent = pool.filter(function (li) { return !li.classList.contains('is-struck'); }).length;
+        document.getElementById('draft-taken').textContent = all.filter(function (li) { return li.classList.contains('is-struck'); }).length;
+        document.getElementById('draft-starred').textContent = all.filter(function (li) { return li.classList.contains('is-starred'); }).length;
+
+        board.querySelectorAll('ol.lists').forEach(function (ol) {
+            ol.classList.toggle('is-empty', !ol.querySelector('.picklist_teams, .picklist-placeholder'));
+        });
+    }
+
+    var queued = false;
+    function schedule() {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(function () { queued = false; update(); });
+    }
+
+    function init() {
+        var board = document.getElementById('picklist-board');
+        if (!board) return;
+        // childList for moves, attributes for star/strike/hidden-column changes.
+        new MutationObserver(schedule).observe(board, {
+            childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'hidden'],
+        });
+        update();
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
+    else { init(); }
 })();
 </script>
 {% endblock %}
